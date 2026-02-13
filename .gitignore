@@ -1,0 +1,37 @@
+# Compiled JavaScript files
+*.js.map
+*.seed
+*.log
+
+# Dependency directories
+node_modules/
+
+# dotenv environment variables file
+.env
+.env.local
+.env.*.local
+
+# Firebase cache
+.firebase/
+
+# Firebase debug log
+firebase-debug.log*
+firebase-debug.*.log*
+
+# Firebase config
+.runtimeconfig.json
+
+# Lock files (optional, comment out if you want to commit them)
+package-lock.json
+yarn.lock
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

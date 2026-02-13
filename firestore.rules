@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 🔹 USERS COLLECTION
+    match /users/{userId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == userId;
+    }
+    
+    // 🔹 SUBMISSIONS COLLECTION
+    match /submissions/{submissionId} {
+      // Helper function to check if user is admin
+      function isAdmin() {
+        return request.auth != null 
+          && request.auth.token.email == "kmkrphd@gmail.com";
+      }
+      
+      // ADMIN: Full access to ALL submissions (pending, approved, rejected, published)
+      allow read, write, update, delete: if isAdmin();
+      
+      // AUTHOR: Can create new submissions
+      allow create: if request.auth != null;
+      
+      // AUTHOR: Can read their own submissions
+      allow read: if request.auth != null
+        && request.auth.uid == resource.data.authorId;
+      
+      // PUBLIC: Anyone can read published papers
+      allow read: if resource.data.isPublished == true;
+    }
+  }
+}
