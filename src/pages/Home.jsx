@@ -1,95 +1,171 @@
 import React from 'react';
 import { Link } from "react-router-dom";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "../services/firebase";
 
 export default function Home() {
+  // Check if user is logged in
+  const [user, loading] = useAuthState(auth);
+
   return (
-    <div className="bg-gray-50 text-gray-900">
+    <div className="bg-white text-gray-900">
 
-      {/* Trust Bar */}
-      <div className="bg-indigo-900 text-white text-sm">
-        <div className="max-w-7xl mx-auto px-6 py-2 flex flex-wrap justify-center gap-6">
-          <span>Peer-Reviewed Journal</span>
-          <span>International Publication</span>
-          <span>Expert Editorial Board</span>
-          <span>Open Access</span>
-        </div>
-      </div>
+      {/* Hero Section with Deep Blue Background */}
+      <section className="bg-gradient-to-br from-blue-900 via-indigo-900 to-blue-800 text-white">
+        <div className="max-w-7xl mx-auto px-6 py-16">
+          
+          {/* Breadcrumb */}
+          <div className="text-sm mb-8 text-blue-200">
+            <Link to="/" className="hover:text-white">Home</Link>
+            <span className="mx-2">›</span>
+            <span>Transactions on Evolutionary Smart Systems</span>
+          </div>
 
-      {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-6 py-28 text-center">
-        <h1 className="text-5xl md:text-6xl font-extrabold mb-6">
-          Transactions on Evolutionary Smart Systems
-        </h1>
+          <div className="grid md:grid-cols-[200px_1fr] gap-8 items-start">
+            {/* Journal Cover */}
+            <div className="bg-white rounded-lg shadow-xl overflow-hidden">
+              <img 
+                src="/journal-cover.jpeg" 
+                alt="Transactions on Evolutionary Smart Systems - Journal Cover" 
+                className="w-full h-auto object-cover"
+              />
+            </div>
 
-        <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto mb-10">
-          An international peer-reviewed journal publishing high-quality
-          research in evolutionary computation, intelligent systems,
-          and smart technologies.
-        </p>
+            {/* Title and Details */}
+            <div>
+              <h1 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
+                Transactions on Evolutionary Smart Systems
+              </h1>
 
-        <div className="flex flex-col sm:flex-row justify-center gap-4">
-          <Link
-            to="/submit"
-            className="px-8 py-4 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition"
-          >
-            Submit Manuscript
-          </Link>
+              {/* Publishing Model */}
+              <div className="mb-6">
+                <div className="text-sm text-blue-200 mb-2">Publishing model</div>
+                <div className="inline-block bg-blue-800 px-4 py-2 rounded-md font-semibold">
+                  Open access
+                </div>
+              </div>
 
-          <Link
-            to="/login"
-            className="px-8 py-4 border border-gray-300 rounded-lg font-semibold hover:bg-gray-100 transition"
-          >
-            Login / Register
-          </Link>
+              {/* Submit Button */}
+              <Link
+                to="/submit"
+                className="inline-flex items-center gap-2 px-8 py-3 bg-white text-blue-900 rounded-lg font-semibold hover:bg-blue-50 transition shadow-lg"
+              >
+                Submit your manuscript
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </Link>
+
+              {/* Login/Register Button */}
+              {!loading && !user && (
+                <Link
+                  to="/login"
+                  className="inline-flex items-center gap-2 px-8 py-3 ml-4 border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-blue-900 transition"
+                >
+                  Login / Register
+                </Link>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* About Section */}
-      <section className="bg-white py-20">
-        <div className="max-w-6xl mx-auto px-6 text-center">
-          <h2 className="text-3xl font-bold mb-6">About the Journal</h2>
+      {/* Trust Bar */}
+      <div className="bg-gray-100 border-b">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex flex-wrap justify-center gap-8 text-sm text-gray-700">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+              </svg>
+              <span className="font-medium">Peer-Reviewed Journal</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z" clipRule="evenodd"/>
+              </svg>
+              <span className="font-medium">International Publication</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
+              </svg>
+              <span className="font-medium">Expert Editorial Board</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
+              </svg>
+              <span className="font-medium">Open Access</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
-          <p className="text-gray-600 text-lg max-w-4xl mx-auto">
-            Transactions on Evolutionary Smart Systems (ToESS) is a scholarly
-            international journal dedicated to advancing research in
-            evolutionary algorithms, artificial intelligence, adaptive systems,
-            and intelligent computing. The journal aims to bridge theoretical
-            foundations and practical applications through a rigorous
-            peer-review process.
+      {/* About Section */}
+      <section className="py-16 border-b">
+        <div className="max-w-5xl mx-auto px-6">
+          <h2 className="text-3xl font-bold mb-6 text-gray-900">About the Journal</h2>
+
+          <p className="text-gray-700 text-lg leading-relaxed mb-6">
+            Transactions on Evolutionary Smart Systems (ToESS) is a scholarly international journal dedicated to advancing research in evolutionary algorithms, artificial intelligence, adaptive systems, and intelligent computing. The journal aims to bridge theoretical foundations and practical applications through a rigorous peer-review process.
+          </p>
+
+          <p className="text-gray-700 text-lg leading-relaxed">
+            The primary aim of ToESS is to provide a high-quality platform for researchers, academicians, and industry professionals to publish innovative and impactful research in evolutionary and smart systems.
           </p>
         </div>
       </section>
 
       {/* Aims & Objectives */}
-      <section className="bg-gray-50 py-20">
-        <div className="max-w-6xl mx-auto px-6">
-          <h2 className="text-3xl font-bold mb-6 text-center">
+      <section className="py-16 bg-gray-50 border-b">
+        <div className="max-w-5xl mx-auto px-6">
+          <h2 className="text-3xl font-bold mb-8 text-gray-900">
             Aims & Objectives
           </h2>
 
-          <p className="text-gray-600 text-lg max-w-4xl mx-auto text-center">
-            The primary aim of ToESS is to provide a high-quality platform for
-            researchers, academicians, and industry professionals to publish
-            innovative and impactful research in evolutionary and smart systems.
-          </p>
-
-          <ul className="mt-10 grid md:grid-cols-2 gap-6 text-gray-700 max-w-4xl mx-auto">
-            <li>• Promote interdisciplinary and innovative research</li>
-            <li>• Encourage real-world and industrial applications</li>
-            <li>• Support emerging research trends and technologies</li>
-            <li>• Ensure ethical and transparent publication practices</li>
-          </ul>
+          <div className="grid md:grid-cols-2 gap-6">
+            {[
+              {
+                title: "Interdisciplinary Research",
+                desc: "Promote innovative research across multiple disciplines"
+              },
+              {
+                title: "Real-World Applications",
+                desc: "Encourage practical and industrial implementations"
+              },
+              {
+                title: "Emerging Technologies",
+                desc: "Support cutting-edge research trends and methodologies"
+              },
+              {
+                title: "Ethical Publishing",
+                desc: "Ensure transparent and ethical publication practices"
+              }
+            ].map((item, index) => (
+              <div key={index} className="flex gap-4">
+                <div className="flex-shrink-0 w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold">
+                  {index + 1}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-1">{item.title}</h3>
+                  <p className="text-gray-600">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* Scope Section */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-6">
-          <h2 className="text-3xl font-bold text-center mb-12">
+      <section className="py-16 border-b">
+        <div className="max-w-5xl mx-auto px-6">
+          <h2 className="text-3xl font-bold mb-8 text-gray-900">
             Scope & Focus Areas
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               "Evolutionary Algorithms",
               "Artificial Intelligence",
@@ -102,67 +178,77 @@ export default function Home() {
             ].map((item) => (
               <div
                 key={item}
-                className="bg-gray-50 p-6 rounded-xl border hover:shadow-md transition text-center font-semibold"
+                className="bg-white p-4 border-l-4 border-indigo-600 shadow-sm hover:shadow-md transition"
               >
-                {item}
+                <span className="font-medium text-gray-800 text-sm">{item}</span>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Editorial Board Preview */}
-      <section className="bg-gray-50 py-20">
-        <div className="max-w-7xl mx-auto px-6">
-          <h2 className="text-3xl font-bold text-center mb-12">
+      {/* Editorial Board */}
+      <section className="py-16 bg-gray-50 border-b">
+        <div className="max-w-5xl mx-auto px-6 text-center">
+          <h2 className="text-3xl font-bold mb-6 text-gray-900">
             Editorial Board
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
-            {[
-              ["Dr. Karthick Raghunath", "Editor-in-Chief"],
-            ].map(([name, role]) => (
-              <div
-                key={name}
-                className="bg-white p-6 rounded-xl border text-center"
-              >
-                <h3 className="font-semibold">{name}</h3>
-                <p className="text-indigo-600 text-sm mt-1">{role}</p>
-                <p className="text-xs text-gray-500 mt-2">
-                  International Researcher
-                </p>
-              </div>
-            ))}
-          </div>
-
-          <p className="text-center mt-10 text-indigo-600 font-semibold cursor-pointer">
-            View Full Editorial Board →
+          <p className="text-gray-700 text-lg leading-relaxed mb-8 max-w-3xl mx-auto">
+            Our editorial board comprises distinguished researchers and academicians from leading institutions worldwide, ensuring the highest standards of peer review and academic excellence.
           </p>
+
+          <Link 
+            to="/editorial-board"
+            className="inline-flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition shadow-lg"
+          >
+            View Full Editorial Board
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </Link>
         </div>
       </section>
 
       {/* Publication Process */}
-      <section className="bg-white py-20">
-        <div className="max-w-6xl mx-auto px-6">
-          <h2 className="text-3xl font-bold text-center mb-12">
+      <section className="py-16 border-b">
+        <div className="max-w-5xl mx-auto px-6">
+          <h2 className="text-3xl font-bold mb-8 text-gray-900">
             Publication Process
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-center">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {[
-              "Register & Verify Email",
-              "Submit Manuscript",
-              "Peer Review Process",
-              "Publication with DOI",
-            ].map((step, index) => (
+              {
+                step: "1",
+                title: "Register & Verify Email",
+                desc: "Create your account"
+              },
+              {
+                step: "2",
+                title: "Submit Manuscript",
+                desc: "Upload your research"
+              },
+              {
+                step: "3",
+                title: "Peer Review Process",
+                desc: "Expert evaluation"
+              },
+              {
+                step: "4",
+                title: "Publication with DOI",
+                desc: "Get published"
+              },
+            ].map((item) => (
               <div
-                key={step}
-                className="p-6 border rounded-xl font-semibold bg-gray-50"
+                key={item.step}
+                className="text-center"
               >
-                <div className="text-indigo-600 text-2xl mb-2">
-                  {index + 1}
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 text-white text-2xl font-bold rounded-full mb-4">
+                  {item.step}
                 </div>
-                {step}
+                <h3 className="font-semibold text-gray-900 mb-2">{item.title}</h3>
+                <p className="text-sm text-gray-600">{item.desc}</p>
               </div>
             ))}
           </div>
@@ -170,31 +256,31 @@ export default function Home() {
       </section>
 
       {/* Ethics & Policies */}
-      <section className="bg-gray-50 py-20">
-        <div className="max-w-6xl mx-auto px-6">
-          <h2 className="text-3xl font-bold text-center mb-10">
+      <section className="py-16 bg-gray-50 border-b">
+        <div className="max-w-5xl mx-auto px-6">
+          <h2 className="text-3xl font-bold mb-8 text-gray-900">
             Publication Ethics & Policies
           </h2>
 
-          <div className="grid md:grid-cols-3 gap-8 text-center">
-            <div className="bg-white p-6 rounded-xl border">
-              <h3 className="font-semibold mb-2">Peer Review</h3>
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 border-l-4 border-indigo-600 shadow-sm">
+              <h3 className="font-semibold text-gray-900 mb-2">Peer Review</h3>
               <p className="text-sm text-gray-600">
-                Double-blind peer review by subject experts.
+                Double-blind peer review by subject experts ensuring quality and rigor.
               </p>
             </div>
 
-            <div className="bg-white p-6 rounded-xl border">
-              <h3 className="font-semibold mb-2">Plagiarism Check</h3>
+            <div className="bg-white p-6 border-l-4 border-indigo-600 shadow-sm">
+              <h3 className="font-semibold text-gray-900 mb-2">Plagiarism Check</h3>
               <p className="text-sm text-gray-600">
-                All manuscripts are screened for originality.
+                All manuscripts are screened for originality using advanced tools.
               </p>
             </div>
 
-            <div className="bg-white p-6 rounded-xl border">
-              <h3 className="font-semibold mb-2">COPE Compliance</h3>
+            <div className="bg-white p-6 border-l-4 border-indigo-600 shadow-sm">
+              <h3 className="font-semibold text-gray-900 mb-2">COPE Compliance</h3>
               <p className="text-sm text-gray-600">
-                Ethical standards following COPE guidelines.
+                Ethical standards following COPE guidelines for academic publishing.
               </p>
             </div>
           </div>
@@ -202,22 +288,26 @@ export default function Home() {
       </section>
 
       {/* Call for Papers */}
-      <section className="bg-indigo-700 text-white py-20 text-center">
-        <h2 className="text-3xl font-bold mb-4">
-          Call for Papers – Current Issue
-        </h2>
+      <section className="bg-gradient-to-r from-indigo-700 to-blue-700 text-white py-20">
+        <div className="max-w-4xl mx-auto px-6 text-center">
+          <h2 className="text-4xl font-bold mb-6">
+            Call for Papers – Current Issue
+          </h2>
 
-        <p className="max-w-3xl mx-auto mb-8 text-lg">
-          ToESS invites original research articles, review papers, and
-          technical notes in all areas within the journal scope.
-        </p>
+          <p className="text-xl mb-8 text-blue-100">
+            ToESS invites original research articles, review papers, and technical notes in all areas within the journal scope.
+          </p>
 
-        <Link
-          to="/submit"
-          className="inline-block px-8 py-4 bg-white text-indigo-700 font-semibold rounded-lg hover:bg-gray-100"
-        >
-          Submit Your Manuscript
-        </Link>
+          <Link
+            to="/submit"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-white text-indigo-700 font-semibold rounded-lg hover:bg-blue-50 transition shadow-lg text-lg"
+          >
+            Submit Your Manuscript
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </Link>
+        </div>
       </section>
 
     </div>

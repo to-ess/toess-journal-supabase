@@ -35,3 +35,9 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# 🔐 Firebase Admin Key
+firebase-export/serviceAccountKey.json
+
+# 🔐 Firestore exported data
+firebase-export/*.json

@@ -1,20 +1,5 @@
 import { Shield, FileSearch, AlertTriangle, XCircle, CheckCircle, Eye, Scale, FileX } from "lucide-react";
-
-// Import this in your actual file:
-// import UsefulSidebar from "../components/UsefulSidebar";
-
-// Demo Sidebar Component
-function UsefulSidebar() {
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-      <h3 className="font-bold text-slate-900 mb-4">Quick Links</h3>
-      <div className="space-y-2 text-sm text-slate-600">
-        <div className="p-2 hover:bg-slate-50 rounded">Author Guidelines</div>
-        <div className="p-2 hover:bg-slate-50 rounded">Contact Us</div>
-      </div>
-    </div>
-  );
-}
+import UsefulSidebar from "../components/UsefulSidebar";
 
 export default function PlagiarismPolicy() {
   const policyAreas = [

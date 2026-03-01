@@ -1,348 +1,630 @@
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../services/firebase";
-import { useEffect, useState } from "react";
-import { Menu, X, ChevronDown, User, LogOut, LayoutDashboard, FileText, Settings } from "lucide-react";
-// Import your logo
-import LogoSVG from "../assets/toessfl.svg"; // Adjust path as needed
+import { useEffect, useState, useRef } from "react";
+import {
+  Menu, X, ChevronDown, LogOut, LayoutDashboard,
+  FileText, Settings, Users, BookOpen, Shield,
+  Star, ChevronRight, Sparkles
+} from "lucide-react";
 
 export default function Navbar() {
   const [user, setUser] = useState(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const dropdownRef = useRef(null);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
-    return () => unsub();
-  }, []);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (userDropdownOpen && !event.target.closest('.user-dropdown-container')) {
-        setUserDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [userDropdownOpen]);
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    setUserDropdownOpen(false);
-    navigate("/");
-  };
-
-  const linkClass = ({ isActive }) =>
-    isActive
-      ? "text-indigo-600 font-semibold border-b-2 border-indigo-600 pb-1"
-      : "text-gray-700 hover:text-indigo-600 transition pb-1";
-
-  const mobileLinkClass = ({ isActive }) =>
-    isActive
-      ? "block px-4 py-3 text-indigo-600 font-semibold bg-indigo-50 rounded-lg"
-      : "block px-4 py-3 text-gray-700 hover:text-indigo-600 hover:bg-gray-50 rounded-lg transition";
+  const location = useLocation();
 
   const isAdmin = user?.email === "kmkrphd@gmail.com";
-  
-  // Get display name or fallback to email
-  const displayName = user?.displayName || user?.email?.split('@')[0] || "User";
+  const displayName = user?.displayName || user?.email?.split("@")[0] || "User";
+  const initials = displayName.slice(0, 2).toUpperCase();
+  const dashPath = isAdmin ? "/dashboard/admin" : "/dashboard/author";
+  const DashIcon = isAdmin ? Shield : LayoutDashboard;
+
+  useEffect(() => { const u = onAuthStateChanged(auth, setUser); return u; }, []);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target))
+        setDropdownOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  useEffect(() => {
+    setMobileOpen(false);
+    setDropdownOpen(false);
+  }, [location.pathname]);
+
+  const handleLogout = async () => { await signOut(auth); navigate("/"); };
+
+  const links = [
+    { to: "/", label: "Home" },
+    { to: "/archives", label: "Archives" },
+    { to: "/scope", label: "Scope" },
+    { to: "/guidelines", label: "Guidelines" },
+    { to: "/contact", label: "Contact" },
+  ];
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm backdrop-blur-sm bg-white/95">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        .nb * { font-family: 'Inter', sans-serif; box-sizing: border-box; }
+
+        .nb-shell {
+          position: sticky;
+          top: 0;
+          z-index: 999;
+          background: #ffffff;
+          border-bottom: 1px solid #e5e7eb;
+          transition: box-shadow 0.3s ease;
+        }
+        .nb-shell.raised {
+          box-shadow: 0 2px 20px rgba(0,0,0,0.07);
+          border-bottom-color: #f3f4f6;
+        }
+
+        .nb-inner {
+          max-width: 1320px;
+          margin: 0 auto;
+          padding: 0 32px;
+          height: 72px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+        }
+
+        /* ── Logo ── */
+        .nb-logo {
+          display: flex;
+          align-items: center;
+          gap: 11px;
+          text-decoration: none;
+          flex-shrink: 0;
+          transition: opacity 0.2s;
+        }
+        .nb-logo:hover { opacity: 0.8; }
+        .nb-logo img { height: 40px; width: 40px; object-fit: contain; }
+        .nb-logo-name {
+          font-size: 20px;
+          font-weight: 800;
+          color: #0f172a;
+          letter-spacing: -0.5px;
+          line-height: 1;
+        }
+        .nb-logo-sub {
+          font-size: 10px;
+          font-weight: 500;
+          color: #94a3b8;
+          letter-spacing: 0.07em;
+          text-transform: uppercase;
+          margin-top: 3px;
+        }
+
+        /* ── Nav links ── */
+        .nb-links {
+          display: flex;
+          align-items: center;
+          gap: 2px;
+          flex: 1;
+          justify-content: center;
+        }
+
+        .nb-link {
+          position: relative;
+          padding: 7px 15px;
+          font-size: 14px;
+          font-weight: 500;
+          color: #4b5563;
+          border-radius: 8px;
+          text-decoration: none;
+          transition: color 0.15s, background 0.15s;
+          white-space: nowrap;
+        }
+        .nb-link:hover {
+          color: #1d4ed8;
+          background: #eff6ff;
+        }
+        .nb-link.active {
+          color: #1d4ed8;
+          font-weight: 600;
+          background: #eff6ff;
+        }
+        .nb-link.active::after {
+          content: '';
+          position: absolute;
+          bottom: 5px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          background: #2563eb;
+        }
+
+        /* ── Right section ── */
+        .nb-right {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-shrink: 0;
+        }
+
+        /* ── Auth buttons ── */
+        .nb-login {
+          padding: 8px 18px;
+          font-size: 14px;
+          font-weight: 500;
+          color: #374151;
+          border-radius: 9px;
+          text-decoration: none;
+          border: 1.5px solid #e5e7eb;
+          background: white;
+          transition: all 0.15s;
+          cursor: pointer;
+        }
+        .nb-login:hover {
+          color: #1d4ed8;
+          border-color: #bfdbfe;
+          background: #eff6ff;
+        }
+
+        .nb-register {
+          padding: 8px 20px;
+          font-size: 14px;
+          font-weight: 600;
+          color: white;
+          border-radius: 9px;
+          text-decoration: none;
+          background: #1d4ed8;
+          border: 1.5px solid #1d4ed8;
+          transition: all 0.2s;
+          display: inline-block;
+          box-shadow: 0 1px 3px rgba(29,78,216,0.3);
+        }
+        .nb-register:hover {
+          background: #1e40af;
+          border-color: #1e40af;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 14px rgba(29,78,216,0.35);
+        }
+
+        /* ── Dashboard pill ── */
+        .nb-dash {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 7px 16px;
+          font-size: 13.5px;
+          font-weight: 600;
+          border-radius: 9px;
+          text-decoration: none;
+          transition: all 0.18s;
+          white-space: nowrap;
+          background: #eff6ff;
+          color: #1d4ed8;
+          border: 1.5px solid #bfdbfe;
+        }
+        .nb-dash:hover {
+          background: #dbeafe;
+          border-color: #93c5fd;
+          transform: translateY(-1px);
+          box-shadow: 0 3px 10px rgba(29,78,216,0.12);
+        }
+        .nb-dash.admin {
+          background: #f5f3ff;
+          color: #6d28d9;
+          border-color: #ddd6fe;
+        }
+        .nb-dash.admin:hover {
+          background: #ede9fe;
+          border-color: #c4b5fd;
+          box-shadow: 0 3px 10px rgba(109,40,217,0.12);
+        }
+
+        /* ── Avatar button ── */
+        .nb-avatar-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 5px 12px 5px 5px;
+          background: #f9fafb;
+          border: 1.5px solid #e5e7eb;
+          border-radius: 50px;
+          cursor: pointer;
+          transition: all 0.18s;
+        }
+        .nb-avatar-btn:hover {
+          background: #f1f5f9;
+          border-color: #bfdbfe;
+          box-shadow: 0 2px 8px rgba(29,78,216,0.1);
+        }
+
+        .nb-avatar {
+          width: 34px;
+          height: 34px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: 700;
+          color: white;
+          flex-shrink: 0;
+        }
+
+        .nb-avatar-name {
+          font-size: 13.5px;
+          font-weight: 600;
+          color: #1e293b;
+          max-width: 110px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .nb-chevron { color: #9ca3af; transition: transform 0.22s ease; flex-shrink: 0; }
+        .nb-chevron.open { transform: rotate(180deg); }
+
+        /* ── Dropdown ── */
+        .nb-dropdown {
+          position: absolute;
+          right: 0;
+          top: calc(100% + 10px);
+          width: 270px;
+          background: white;
+          border-radius: 16px;
+          border: 1px solid #e5e7eb;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.1), 0 4px 16px rgba(0,0,0,0.05);
+          overflow: hidden;
+          transform-origin: top right;
+          animation: nbDrop 0.2s cubic-bezier(0.34,1.56,0.64,1);
+          z-index: 200;
+        }
+        @keyframes nbDrop {
+          from { opacity:0; transform: scale(0.9) translateY(-8px); }
+          to   { opacity:1; transform: scale(1)   translateY(0); }
+        }
+
+        .nb-dd-head {
+          padding: 14px 16px;
+          background: linear-gradient(135deg, #f8faff, #f0f7ff);
+          border-bottom: 1px solid #e5e7eb;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .nb-dd-name { font-size: 13.5px; font-weight: 700; color: #0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .nb-dd-email { font-size: 11.5px; color: #6b7280; margin-top: 1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .nb-dd-badge {
+          display: inline-block;
+          margin-top: 5px;
+          padding: 2px 9px;
+          border-radius: 20px;
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .nb-dd-sec { padding: 6px 0; }
+        .nb-dd-sec + .nb-dd-sec { border-top: 1px solid #f3f4f6; }
+
+        .nb-dd-item {
+          display: flex;
+          align-items: center;
+          gap: 11px;
+          padding: 9px 16px;
+          font-size: 13.5px;
+          font-weight: 500;
+          color: #374151;
+          text-decoration: none;
+          transition: all 0.14s;
+          cursor: pointer;
+          border: none;
+          background: none;
+          width: 100%;
+          text-align: left;
+        }
+        .nb-dd-item:hover { background: #f0f7ff; color: #1d4ed8; }
+        .nb-dd-item:hover .nb-dd-ico { background: #dbeafe; color: #1d4ed8; }
+        .nb-dd-item.danger:hover { background: #fff1f2; color: #dc2626; }
+        .nb-dd-item.danger:hover .nb-dd-ico { background: #fee2e2; color: #dc2626; }
+
+        .nb-dd-ico {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          background: #f1f5f9;
+          color: #64748b;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          transition: all 0.14s;
+        }
+        .nb-dd-arrow { margin-left: auto; color: #d1d5db; flex-shrink: 0; }
+
+        /* ── Hamburger ── */
+        .nb-ham {
+          display: none;
+          padding: 8px;
+          border-radius: 8px;
+          border: 1.5px solid #e5e7eb;
+          background: white;
+          color: #374151;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .nb-ham:hover { background: #f1f5f9; border-color: #d1d5db; }
+
+        /* ── Mobile menu ── */
+        .nb-mobile {
+          background: white;
+          border-top: 1px solid #f1f5f9;
+          padding: 12px 16px 20px;
+          animation: nbSlide 0.2s cubic-bezier(0.34,1.2,0.64,1);
+        }
+        @keyframes nbSlide {
+          from { opacity:0; transform: translateY(-8px); }
+          to   { opacity:1; transform: translateY(0); }
+        }
+
+        .nb-mob-link {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          padding: 10px 13px;
+          font-size: 14px;
+          font-weight: 500;
+          color: #374151;
+          border-radius: 9px;
+          text-decoration: none;
+          transition: all 0.14s;
+          border: none;
+          background: none;
+          cursor: pointer;
+          width: 100%;
+          text-align: left;
+        }
+        .nb-mob-link:hover, .nb-mob-link.active { background: #eff6ff; color: #1d4ed8; }
+        .nb-mob-link.danger { color: #dc2626; }
+        .nb-mob-link.danger:hover { background: #fff1f2; }
+
+        @media (max-width: 1023px) {
+          .nb-links, .nb-right { display: none !important; }
+          .nb-ham { display: flex !important; align-items: center; }
+        }
+      `}</style>
+
+      <div className={`nb nb-shell${scrolled ? " raised" : ""}`}>
+        <div className="nb-inner">
+
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition">
-            {/* SVG Logo */}
-            <img 
-              src={LogoSVG} 
-              alt="ToESS Logo" 
-              className="h-10 w-10 object-contain"
-            />
-            
-            {/* Logo Text */}
-            <div className="hidden sm:flex flex-col">
-              <span className="text-xl font-bold text-gray-900 tracking-tight leading-tight">ToESS</span>
-              <span className="text-[10px] text-gray-500 -mt-0.5 leading-tight">
-                Evolutionary Smart Systems
-              </span>
+          <Link to="/" className="nb-logo">
+            <img src="/toess-logo.svg" alt="ToESS" />
+            <div className="hidden sm:block">
+              <div className="nb-logo-name">ToESS</div>
+              <div className="nb-logo-sub">Evolutionary Smart Systems</div>
             </div>
-            
-            {/* Mobile - Just abbreviation */}
-            <span className="sm:hidden text-xl font-bold text-gray-900">ToESS</span>
+            <span className="sm:hidden nb-logo-name">ToESS</span>
           </Link>
 
-          {/* Rest of navbar remains the same... */}
-          {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center gap-1">
-            <NavLink to="/" className={linkClass}>
-              <span className="px-4 py-2 block">Home</span>
-            </NavLink>
-            <NavLink to="/archives" className={linkClass}>
-              <span className="px-4 py-2 block">Archives</span>
-            </NavLink>
-            <NavLink to="/scope" className={linkClass}>
-              <span className="px-4 py-2 block">Scope</span>
-            </NavLink>
-            <NavLink to="/guidelines" className={linkClass}>
-              <span className="px-4 py-2 block">Guidelines</span>
-            </NavLink>
-            <NavLink to="/contact" className={linkClass}>
-              <span className="px-4 py-2 block">Contact</span>
-            </NavLink>
+          {/* Center nav */}
+          <nav className="nb-links">
+            {links.map(({ to, label }) => (
+              <NavLink key={to} to={to} end={to === "/"}
+                className={({ isActive }) => `nb-link${isActive ? " active" : ""}`}>
+                {label}
+              </NavLink>
+            ))}
             {user && (
-              <NavLink to="/submit" className={linkClass}>
-                <span className="px-4 py-2 block">Submit</span>
+              <NavLink to="/submit"
+                className={({ isActive }) => `nb-link${isActive ? " active" : ""}`}>
+                Submit
               </NavLink>
             )}
           </nav>
 
-          {/* Desktop Auth Section */}
-          <div className="hidden lg:flex items-center gap-3">
+          {/* Right */}
+          <div className="nb-right">
             {!user ? (
               <>
-                <Link 
-                  to="/login" 
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-indigo-600 transition rounded-lg hover:bg-gray-50"
-                >
-                  Login
-                </Link>
-                <Link 
-                  to="/register" 
-                  className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-700 hover:to-blue-700 transition shadow-md hover:shadow-lg"
-                >
-                  Register
-                </Link>
+                <Link to="/login" className="nb-login">Login</Link>
+                <Link to="/register" className="nb-register">Register</Link>
               </>
             ) : (
-              <div className="relative user-dropdown-container">
-                <button
-                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                  className="flex items-center gap-2.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition border border-gray-200 group"
-                >
-                  <div className="w-9 h-9 bg-gradient-to-br from-indigo-600 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
-                    <span className="text-sm font-bold text-white">
-                      {displayName.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-start max-w-[140px]">
-                    <span className="text-xs text-gray-500 font-medium">
-                      {isAdmin ? "Admin" : "Author"}
-                    </span>
-                    <span className="text-sm font-semibold text-gray-900 truncate w-full">
-                      {displayName}
-                    </span>
-                  </div>
-                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${userDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
+              <>
+                {/* Dashboard pill */}
+                <Link to={dashPath} className={`nb-dash${isAdmin ? " admin" : ""}`}>
+                  <DashIcon size={14} />
+                  {isAdmin ? "Admin Panel" : "Dashboard"}
+                </Link>
 
-                {/* Enhanced Dropdown */}
-                {userDropdownOpen && (
-                  <>
-                    {/* Backdrop */}
-                    <div className="fixed inset-0 z-40" onClick={() => setUserDropdownOpen(false)}></div>
-                    
-                    {/* Dropdown Menu */}
-                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                      {/* User Header */}
-                      <div className="px-4 py-4 bg-gradient-to-r from-indigo-50 to-blue-50 border-b border-gray-200">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-blue-600 rounded-full flex items-center justify-center shadow-md">
-                            <span className="text-xl font-bold text-white">
-                              {displayName.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-gray-900 truncate">
-                              {displayName}
-                            </p>
-                            <p className="text-xs text-gray-600 truncate">{user.email}</p>
-                            <div className="flex items-center gap-2 mt-1.5">
-                              <span className="inline-block px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full">
-                                {isAdmin ? "Administrator" : "Author"}
-                              </span>
-                              {user.emailVerified && (
-                                <span className="inline-block px-2.5 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
-                                  Verified
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                {/* Avatar dropdown */}
+                <div style={{ position: "relative" }} ref={dropdownRef}>
+                  <button className="nb-avatar-btn" onClick={() => setDropdownOpen(v => !v)}>
+                    <div className="nb-avatar" style={{
+                      background: isAdmin
+                        ? "linear-gradient(135deg,#7c3aed,#6d28d9)"
+                        : "linear-gradient(135deg,#1d4ed8,#2563eb)"
+                    }}>
+                      {initials}
+                    </div>
+                    <span className="nb-avatar-name hidden xl:block">{displayName}</span>
+                    <ChevronDown size={14} className={`nb-chevron${dropdownOpen ? " open" : ""}`} />
+                  </button>
+
+                  {dropdownOpen && (
+                    <div className="nb-dropdown">
+                      {/* Header */}
+                      <div className="nb-dd-head">
+                        <div className="nb-avatar" style={{
+                          width: 42, height: 42, fontSize: "14px", flexShrink: 0,
+                          background: isAdmin
+                            ? "linear-gradient(135deg,#7c3aed,#6d28d9)"
+                            : "linear-gradient(135deg,#1d4ed8,#2563eb)"
+                        }}>{initials}</div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div className="nb-dd-name">{displayName}</div>
+                          <div className="nb-dd-email">{user.email}</div>
+                          <span className="nb-dd-badge" style={{
+                            background: isAdmin ? "#ede9fe" : "#dbeafe",
+                            color: isAdmin ? "#6d28d9" : "#1d4ed8"
+                          }}>
+                            {isAdmin ? "Administrator" : "Author"}
+                          </span>
                         </div>
                       </div>
 
-                      {/* Navigation */}
-                      <div className="py-2">
-                        <div className="px-4 py-2">
-                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Navigation</p>
-                        </div>
-                        <Link
-                          to={isAdmin ? "/dashboard/admin" : "/dashboard/author"}
-                          onClick={() => setUserDropdownOpen(false)}
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition group"
-                        >
-                          <div className="w-8 h-8 bg-gray-100 group-hover:bg-indigo-100 rounded-lg flex items-center justify-center transition">
-                            <LayoutDashboard className="w-4 h-4 text-gray-600 group-hover:text-indigo-600" />
-                          </div>
-                          <span className="font-medium">Dashboard</span>
+                      {/* Nav items */}
+                      <div className="nb-dd-sec">
+                        <Link to={dashPath} className="nb-dd-item" onClick={() => setDropdownOpen(false)}>
+                          <span className="nb-dd-ico"><DashIcon size={14} /></span>
+                          {isAdmin ? "Admin Panel" : "Dashboard"}
+                          <ChevronRight size={13} className="nb-dd-arrow" />
                         </Link>
-                        <Link
-                          to="/submit"
-                          onClick={() => setUserDropdownOpen(false)}
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition group"
-                        >
-                          <div className="w-8 h-8 bg-gray-100 group-hover:bg-indigo-100 rounded-lg flex items-center justify-center transition">
-                            <FileText className="w-4 h-4 text-gray-600 group-hover:text-indigo-600" />
-                          </div>
-                          <span className="font-medium">Submit Paper</span>
+                        <Link to="/submit" className="nb-dd-item" onClick={() => setDropdownOpen(false)}>
+                          <span className="nb-dd-ico"><FileText size={14} /></span>
+                          Submit Paper
+                          <ChevronRight size={13} className="nb-dd-arrow" />
+                        </Link>
+                        {!isAdmin && (
+                          <Link to="/reviewer-registration" className="nb-dd-item" onClick={() => setDropdownOpen(false)}>
+                            <span className="nb-dd-ico"><Star size={14} /></span>
+                            Apply as Reviewer
+                            <ChevronRight size={13} className="nb-dd-arrow" />
+                          </Link>
+                        )}
+                        {isAdmin && (
+                          <>
+                            <Link to="/dashboard/admin/manage-reviewers" className="nb-dd-item" onClick={() => setDropdownOpen(false)}>
+                              <span className="nb-dd-ico"><Users size={14} /></span>
+                              Manage Reviewers
+                              <ChevronRight size={13} className="nb-dd-arrow" />
+                            </Link>
+                            <Link to="/dashboard/admin/assign-reviewers" className="nb-dd-item" onClick={() => setDropdownOpen(false)}>
+                              <span className="nb-dd-ico"><Sparkles size={14} /></span>
+                              Assign Reviewers
+                              <ChevronRight size={13} className="nb-dd-arrow" />
+                            </Link>
+                            <Link to="/dashboard/admin/review-decisions" className="nb-dd-item" onClick={() => setDropdownOpen(false)}>
+                              <span className="nb-dd-ico"><BookOpen size={14} /></span>
+                              Review Decisions
+                              <ChevronRight size={13} className="nb-dd-arrow" />
+                            </Link>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="nb-dd-sec">
+                        <Link to="/settings/profile" className="nb-dd-item" onClick={() => setDropdownOpen(false)}>
+                          <span className="nb-dd-ico"><Settings size={14} /></span>
+                          Settings
+                          <ChevronRight size={13} className="nb-dd-arrow" />
                         </Link>
                       </div>
 
-                      {/* Settings */}
-                      <div className="border-t border-gray-100 py-2">
-                        <div className="px-4 py-2">
-                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Settings</p>
-                        </div>
-                        <Link 
-                          to="/profile-settings" 
-                          onClick={() => setUserDropdownOpen(false)} 
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition group"
-                        >
-                          <div className="w-8 h-8 bg-gray-100 group-hover:bg-indigo-100 rounded-lg flex items-center justify-center transition">
-                            <Settings className="w-4 h-4 text-gray-600 group-hover:text-indigo-600" />
-                          </div>
-                          <span className="font-medium">Profile Settings</span>
-                        </Link>
-                      </div>
-
-                      {/* Logout */}
-                      <div className="border-t border-gray-100 pt-2">
-                        <button 
-                          onClick={handleLogout} 
-                          className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition font-medium group"
-                        >
-                          <div className="w-8 h-8 bg-red-50 group-hover:bg-red-100 rounded-lg flex items-center justify-center transition">
-                            <LogOut className="w-4 h-4 text-red-600" />
-                          </div>
-                          <span>Logout</span>
+                      <div className="nb-dd-sec">
+                        <button className="nb-dd-item danger" onClick={handleLogout}>
+                          <span className="nb-dd-ico"><LogOut size={14} /></span>
+                          Sign Out
                         </button>
                       </div>
                     </div>
-                  </>
-                )}
-              </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <button 
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
-            className="lg:hidden p-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
-            aria-label="Toggle menu"
-          >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          {/* Mobile hamburger */}
+          <button className="nb-ham" onClick={() => setMobileOpen(v => !v)}>
+            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
 
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="lg:hidden py-4 space-y-1 border-t border-gray-100">
-            <NavLink to="/" className={mobileLinkClass} onClick={() => setMobileMenuOpen(false)}>
-              Home
-            </NavLink>
-            <NavLink to="/archives" className={mobileLinkClass} onClick={() => setMobileMenuOpen(false)}>
-              Archives
-            </NavLink>
-            <NavLink to="/scope" className={mobileLinkClass} onClick={() => setMobileMenuOpen(false)}>
-              Scope
-            </NavLink>
-            <NavLink to="/guidelines" className={mobileLinkClass} onClick={() => setMobileMenuOpen(false)}>
-              Guidelines
-            </NavLink>
-            <NavLink to="/contact" className={mobileLinkClass} onClick={() => setMobileMenuOpen(false)}>
-              Contact
-            </NavLink>
-            
-            {user ? (
-              <>
-                <NavLink to="/submit" className={mobileLinkClass} onClick={() => setMobileMenuOpen(false)}>
-                  Submit Paper
+        {/* Mobile menu */}
+        {mobileOpen && (
+          <div className="nb-mobile">
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {links.map(({ to, label }) => (
+                <NavLink key={to} to={to} end={to === "/"}
+                  className={({ isActive }) => `nb-mob-link${isActive ? " active" : ""}`}>
+                  {label}
                 </NavLink>
-                <div className="border-t border-gray-200 mt-2 pt-3 space-y-2">
-                  <div className="px-4 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-blue-600 rounded-full flex items-center justify-center">
-                        <span className="text-sm font-bold text-white">
-                          {displayName.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">{displayName}</p>
-                        <p className="text-xs text-gray-600 truncate">{user.email}</p>
-                      </div>
+              ))}
+              {user && (
+                <NavLink to="/submit"
+                  className={({ isActive }) => `nb-mob-link${isActive ? " active" : ""}`}>
+                  <FileText size={15} /> Submit
+                </NavLink>
+              )}
+
+              {user ? (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #f1f5f9", display: "flex", flexDirection: "column", gap: 2 }}>
+                  {/* User card */}
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "10px 13px",
+                    background: "linear-gradient(135deg,#f8faff,#eff6ff)",
+                    border: "1px solid #e0e7ff",
+                    borderRadius: 12, marginBottom: 6
+                  }}>
+                    <div className="nb-avatar" style={{
+                      width: 40, height: 40, fontSize: "13px", flexShrink: 0,
+                      background: isAdmin ? "linear-gradient(135deg,#7c3aed,#6d28d9)" : "linear-gradient(135deg,#1d4ed8,#2563eb)"
+                    }}>{initials}</div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayName}</div>
+                      <div style={{ fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</div>
                     </div>
-                    <span className="inline-block px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full">
-                      {isAdmin ? "Administrator" : "Author"}
-                    </span>
+                    <span style={{
+                      padding: "2px 9px", borderRadius: 20, flexShrink: 0,
+                      fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em",
+                      background: isAdmin ? "#ede9fe" : "#dbeafe",
+                      color: isAdmin ? "#6d28d9" : "#1d4ed8"
+                    }}>{isAdmin ? "Admin" : "Author"}</span>
                   </div>
-                  <NavLink 
-                    to={isAdmin ? "/dashboard/admin" : "/dashboard/author"} 
-                    className={mobileLinkClass} 
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <LayoutDashboard className="w-4 h-4" />
-                      <span>Dashboard</span>
-                    </div>
-                  </NavLink>
-                  <NavLink 
-                    to="/profile-settings" 
-                    className={mobileLinkClass} 
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Settings className="w-4 h-4" />
-                      <span>Profile Settings</span>
-                    </div>
-                  </NavLink>
-                  <button
-                    onClick={() => {
-                      handleLogout();
-                      setMobileMenuOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition font-medium"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    <span>Logout</span>
-                  </button>
+
+                  <Link to={dashPath} className="nb-mob-link"><DashIcon size={15} /> {isAdmin ? "Admin Panel" : "Dashboard"}</Link>
+                  {!isAdmin && <Link to="/reviewer-registration" className="nb-mob-link"><Star size={15} /> Apply as Reviewer</Link>}
+                  {isAdmin && (
+                    <>
+                      <Link to="/dashboard/admin/manage-reviewers" className="nb-mob-link"><Users size={15} /> Manage Reviewers</Link>
+                      <Link to="/dashboard/admin/assign-reviewers" className="nb-mob-link"><Sparkles size={15} /> Assign Reviewers</Link>
+                      <Link to="/dashboard/admin/review-decisions" className="nb-mob-link"><BookOpen size={15} /> Review Decisions</Link>
+                    </>
+                  )}
+                  <Link to="/settings/profile" className="nb-mob-link"><Settings size={15} /> Settings</Link>
+                  <button onClick={handleLogout} className="nb-mob-link danger"><LogOut size={15} /> Sign Out</button>
                 </div>
-              </>
-            ) : (
-              <div className="border-t border-gray-200 mt-2 pt-3 space-y-2">
-                <Link 
-                  to="/login" 
-                  className="block px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition font-medium text-center border border-gray-200"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Login
-                </Link>
-                <Link 
-                  to="/register" 
-                  className="block px-4 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-lg font-semibold hover:from-indigo-700 hover:to-blue-700 transition text-center shadow-md"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Register
-                </Link>
-              </div>
-            )}
+              ) : (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #f1f5f9", display: "flex", flexDirection: "column", gap: 8 }}>
+                  <Link to="/login" className="nb-mob-link" style={{ justifyContent: "center", border: "1.5px solid #e5e7eb" }}>Login</Link>
+                  <Link to="/register" style={{
+                    display: "block", padding: "10px", textAlign: "center",
+                    fontSize: 14, fontWeight: 600, color: "white",
+                    borderRadius: 9, background: "#1d4ed8", textDecoration: "none"
+                  }}>Register</Link>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
-    </header>
+    </>
   );
 }

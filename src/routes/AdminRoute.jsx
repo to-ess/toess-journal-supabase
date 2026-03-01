@@ -1,31 +1,18 @@
 import { Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
 import { auth } from "../services/firebase";
-import { getUserRole } from "../services/userService";
+
+const ADMIN_EMAIL = "kmkrphd@gmail.com";
 
 export default function AdminRoute({ children }) {
-  const [allowed, setAllowed] = useState(null);
+  const user = auth.currentUser;
 
-  useEffect(() => {
-    const checkRole = async () => {
-      const user = auth.currentUser;
-      if (!user) {
-        setAllowed(false);
-        return;
-      }
-
-      const role = await getUserRole(user.uid);
-      setAllowed(role === "admin");
-    };
-
-    checkRole();
-  }, []);
-
-  if (allowed === null) {
-    return <div className="p-10">Checking permissions...</div>;
+  if (!user) {
+    return <Navigate to="/login" replace />;
   }
 
-  if (!allowed) {
+  // ✅ Check email directly — same logic as Firestore rules
+  // No Firestore lookup needed, so wiping the DB won't break admin access
+  if (user.email !== ADMIN_EMAIL) {
     return <Navigate to="/dashboard/author" replace />;
   }
 

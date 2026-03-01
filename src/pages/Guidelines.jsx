@@ -1,5 +1,6 @@
 import React from 'react';
 import { FileText, CheckCircle, Upload, Clock, AlertCircle, BookOpen, Download, Send, Shield, Scale } from "lucide-react";
+import SidebarLayout from '../layouts/SidebarLayout';
 
 export default function Guidelines() {
   const submissionSteps = [
@@ -30,22 +31,14 @@ export default function Guidelines() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-indigo-900 to-blue-900 text-white">
-        <div className="max-w-7xl mx-auto px-6 py-20">
-          <div className="text-center max-w-4xl mx-auto">
-            <h1 className="text-5xl font-bold mb-6">Author Guidelines</h1>
-            <p className="text-xl text-blue-100 leading-relaxed">
-              Complete guidelines for preparing and submitting your manuscript to ToESS
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-6 py-16">
+    <SidebarLayout
+      title="Author Guidelines"
+      subtitle="Transaction on Evolutionary Smart Systems"
+      icon={FileText}
+    >
+      <div className="space-y-12">
         {/* Quick Links */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-6 mb-12">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
           <h3 className="font-bold text-slate-900 mb-4">Quick Links</h3>
           <div className="flex flex-wrap gap-3">
             <a href="#preparation" className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition text-sm font-medium">
@@ -64,7 +57,7 @@ export default function Guidelines() {
         </div>
 
         {/* Scope and Mission */}
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 p-8 mb-12">
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 p-8">
           <h2 className="text-2xl font-bold text-slate-900 mb-4">Scope and Mission</h2>
           <p className="text-slate-700 leading-relaxed">
             ToESS is dedicated to publishing groundbreaking research in the field of evolutionary smart systems. Covering a broad spectrum of topics, we emphasize innovative approaches and applications in this dynamic field. For detailed scope and areas, please visit our <a href="/scope" className="text-indigo-600 hover:text-indigo-700 font-semibold underline">Scope page</a>.
@@ -72,7 +65,7 @@ export default function Guidelines() {
         </div>
 
         {/* Submission Process Overview */}
-        <div className="mb-16">
+        <div>
           <h2 className="text-3xl font-bold text-slate-900 mb-8 text-center">Submission Process</h2>
           <div className="grid md:grid-cols-4 gap-6">
             {submissionSteps.map((item) => {
@@ -94,14 +87,13 @@ export default function Guidelines() {
         </div>
 
         {/* Manuscript Preparation */}
-        <div id="preparation" className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 mb-12">
+        <div id="preparation" className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
           <div className="flex items-center gap-3 mb-6">
             <BookOpen className="w-8 h-8 text-indigo-600" />
             <h2 className="text-2xl font-bold text-slate-900">Manuscript Preparation</h2>
           </div>
           
           <div className="space-y-6">
-            {/* Format Requirements */}
             <div>
               <h3 className="text-lg font-bold text-slate-900 mb-3">Format Requirements</h3>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
@@ -126,7 +118,6 @@ export default function Guidelines() {
               </div>
             </div>
 
-            {/* Structure */}
             <div>
               <h3 className="text-lg font-bold text-slate-900 mb-3">Manuscript Structure</h3>
               <div className="grid md:grid-cols-2 gap-4">
@@ -151,7 +142,7 @@ export default function Guidelines() {
         </div>
 
         {/* Submission Requirements */}
-        <div id="submission" className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 mb-12">
+        <div id="submission" className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
           <div className="flex items-center gap-3 mb-6">
             <Send className="w-8 h-8 text-indigo-600" />
             <h2 className="text-2xl font-bold text-slate-900">Submission Requirements</h2>
@@ -182,7 +173,7 @@ export default function Guidelines() {
         </div>
 
         {/* Image and Table Guidelines */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 mb-12">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
           <h2 className="text-2xl font-bold text-slate-900 mb-6">Image and Table Guidelines</h2>
           <div className="grid md:grid-cols-2 gap-6">
             <div className="p-6 bg-indigo-50 rounded-lg border border-indigo-200">
@@ -211,7 +202,7 @@ export default function Guidelines() {
         </div>
 
         {/* Review and Decision Process */}
-        <div id="review" className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 mb-12">
+        <div id="review" className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
           <div className="flex items-center gap-3 mb-6">
             <Clock className="w-8 h-8 text-indigo-600" />
             <h2 className="text-2xl font-bold text-slate-900">Review and Decision Process</h2>
@@ -259,55 +250,51 @@ export default function Guidelines() {
         </div>
 
         {/* After Acceptance */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 mb-12">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
           <h2 className="text-2xl font-bold text-slate-900 mb-6">After Acceptance</h2>
-          <div className="space-y-4">
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="p-6 bg-green-50 rounded-lg border border-green-200">
-                <h3 className="font-semibold text-slate-900 mb-2">Editing & Production</h3>
-                <p className="text-sm text-slate-600">Copyediting and PDF production (<strong>~3 working days</strong>)</p>
-              </div>
-              <div className="p-6 bg-blue-50 rounded-lg border border-blue-200">
-                <h3 className="font-semibold text-slate-900 mb-2">Open Access</h3>
-                <p className="text-sm text-slate-600">Articles published with <strong>unique DOI</strong> for global recognition</p>
-              </div>
-              <div className="p-6 bg-purple-50 rounded-lg border border-purple-200">
-                <h3 className="font-semibold text-slate-900 mb-2">Promotion</h3>
-                <p className="text-sm text-slate-600">Promoted on social and academic platforms</p>
-              </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="p-6 bg-green-50 rounded-lg border border-green-200">
+              <h3 className="font-semibold text-slate-900 mb-2">Editing & Production</h3>
+              <p className="text-sm text-slate-600">Copyediting and PDF production (<strong>~3 working days</strong>)</p>
+            </div>
+            <div className="p-6 bg-blue-50 rounded-lg border border-blue-200">
+              <h3 className="font-semibold text-slate-900 mb-2">Open Access</h3>
+              <p className="text-sm text-slate-600">Articles published with <strong>unique DOI</strong> for global recognition</p>
+            </div>
+            <div className="p-6 bg-purple-50 rounded-lg border border-purple-200">
+              <h3 className="font-semibold text-slate-900 mb-2">Promotion</h3>
+              <p className="text-sm text-slate-600">Promoted on social and academic platforms</p>
             </div>
           </div>
         </div>
 
         {/* Copyright and Licensing */}
-        <div id="copyright" className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 mb-12">
+        <div id="copyright" className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
           <div className="flex items-center gap-3 mb-6">
             <Scale className="w-8 h-8 text-indigo-600" />
             <h2 className="text-2xl font-bold text-slate-900">Copyright and Licensing</h2>
           </div>
           
-          <div className="space-y-4">
-            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-6">
-              <ul className="space-y-3 text-slate-700">
-                <li className="flex items-start gap-2">
-                  <Shield className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
-                  <span><strong>Authors retain copyright</strong> of their work</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Shield className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
-                  <span>ToESS holds <strong>publication rights</strong></span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Shield className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
-                  <span>Publications are under a <strong>Creative Commons Attribution 4.0 License</strong></span>
-                </li>
-              </ul>
-            </div>
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-6">
+            <ul className="space-y-3 text-slate-700">
+              <li className="flex items-start gap-2">
+                <Shield className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+                <span><strong>Authors retain copyright</strong> of their work</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Shield className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+                <span>ToESS holds <strong>publication rights</strong></span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Shield className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+                <span>Publications are under a <strong>Creative Commons Attribution 4.0 License</strong></span>
+              </li>
+            </ul>
           </div>
         </div>
 
         {/* Reference Style */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 mb-12">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
           <h2 className="text-2xl font-bold text-slate-900 mb-4">Reference Style</h2>
           <p className="text-slate-700">
             Adhere to the specific formatting for various types of references, as detailed on our website.
@@ -338,6 +325,6 @@ export default function Guidelines() {
           </div>
         </div>
       </div>
-    </div>
+    </SidebarLayout>
   );
 }
