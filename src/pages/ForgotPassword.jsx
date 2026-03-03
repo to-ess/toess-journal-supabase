@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { sendPasswordResetEmail } from "firebase/auth";
-import { auth } from "../services/firebase";
+
+import { supabase } from "../services/supabase";
 import { Link } from "react-router-dom";
 
 export default function ForgotPassword() {
@@ -33,7 +33,7 @@ export default function ForgotPassword() {
     setLoading(true);
 
     try {
-      await sendPasswordResetEmail(auth, email);
+      await supabase.auth.resetPasswordForEmail(email);
       setMessage(
         "Password reset email sent. Please check your inbox."
       );

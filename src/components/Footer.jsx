@@ -1,8 +1,6 @@
 import { Link } from "react-router-dom";
 import { 
   Mail, 
-  Phone, 
-  MapPin, 
   Facebook, 
   Twitter, 
   Linkedin, 
@@ -11,7 +9,6 @@ import {
   FileText,
   BookOpen,
   Users,
-  Send
 } from "lucide-react";
 
 export default function Footer() {
@@ -132,9 +129,9 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link to="/publication-ethics" className="text-gray-400 hover:text-indigo-400 transition flex items-center gap-2 group">
+                <Link to="/publication-policy" className="text-gray-400 hover:text-indigo-400 transition flex items-center gap-2 group">
                   <span className="w-1.5 h-1.5 bg-gray-600 rounded-full group-hover:bg-indigo-400 transition"></span>
-                  Publication Ethics
+                  Publication Policy
                 </Link>
               </li>
               <li>
@@ -144,9 +141,9 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link to="/article-processing" className="text-gray-400 hover:text-indigo-400 transition flex items-center gap-2 group">
+                <Link to="/faqs" className="text-gray-400 hover:text-indigo-400 transition flex items-center gap-2 group">
                   <span className="w-1.5 h-1.5 bg-gray-600 rounded-full group-hover:bg-indigo-400 transition"></span>
-                  Article Processing
+                  FAQs
                 </Link>
               </li>
             </ul>
@@ -169,19 +166,10 @@ export default function Footer() {
                 </div>
               </li>
               <li className="flex items-start gap-3">
-                <Send className="w-4 h-4 text-gray-500 mt-1 flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Submissions</p>
-                  <a href="mailto:submit@toess.org" className="text-gray-300 hover:text-indigo-400 transition">
-                    submit@toess.org
-                  </a>
-                </div>
-              </li>
-              <li className="flex items-start gap-3">
                 <FileText className="w-4 h-4 text-gray-500 mt-1 flex-shrink-0" />
                 <div>
                   <p className="text-xs text-gray-500 mb-1">ISSN</p>
-                  <p className="text-gray-300">XXXX-XXXX (Online)</p>
+                  <p className="text-gray-300">0000-0000 (Online)</p>
                 </div>
               </li>
               <li className="pt-2">
@@ -222,8 +210,8 @@ export default function Footer() {
                 Terms of Service
               </Link>
               <span className="text-gray-700">•</span>
-              <Link to="/accessibility" className="text-gray-400 hover:text-indigo-400 transition">
-                Accessibility
+              <Link to="/disclaimer" className="text-gray-400 hover:text-indigo-400 transition">
+                Disclaimer
               </Link>
               <span className="text-gray-700">•</span>
               <Link to="/sitemap" className="text-gray-400 hover:text-indigo-400 transition">

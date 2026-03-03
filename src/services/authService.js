@@ -1,60 +1,67 @@
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  sendEmailVerification,
-  signOut,
-  onAuthStateChanged,
-  GoogleAuthProvider,
-  signInWithPopup,
-} from "firebase/auth";
-import { auth } from "./firebase";
+import { supabase } from "./supabase";
 
 /**
  * Register new user with email/password
- * → sends verification email
  */
 export const registerUser = async (email, password) => {
-  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-  const user = userCredential.user;
-  await sendEmailVerification(user);
-  return user;
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: `${window.location.origin}/login`
+    }
+  });
+  if (error) throw error;
+  return data.user;
 };
 
 /**
- * Login user with email/password
- * → allows login ONLY if email is verified
+ * Login with email/password
  */
 export const loginUser = async (email, password) => {
-  const userCredential = await signInWithEmailAndPassword(auth, email, password);
-  const user = userCredential.user;
-  if (!user.emailVerified) {
-    await signOut(auth);
-    throw new Error("Please verify your email before logging in.");
-  }
-  return user;
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return data.user;
 };
 
 /**
- * Google Sign-In (login + register both use this)
- * Google accounts are pre-verified — no email verification needed
+ * Google OAuth — redirects browser to Google, then back to /auth/callback
+ * This is the industry standard flow for SPAs with Supabase
  */
 export const signInWithGoogle = async () => {
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: "select_account" });
-  const userCredential = await signInWithPopup(auth, provider);
-  return userCredential.user;
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`,
+      queryParams: { prompt: "select_account" }
+    }
+  });
+  if (error) throw error;
+  // Browser redirects — nothing to return
 };
 
 /**
- * Logout user
+ * Logout
  */
 export const logoutUser = async () => {
-  await signOut(auth);
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
 };
 
 /**
- * Listen to auth state changes
+ * Observe auth state changes
  */
 export const observeAuth = (callback) => {
-  return onAuthStateChanged(auth, callback);
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    callback(session?.user || null);
+  });
+  return () => subscription.unsubscribe();
+};
+
+/**
+ * Get current user
+ */
+export const getCurrentUser = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
 };

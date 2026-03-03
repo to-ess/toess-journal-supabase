@@ -1,54 +1,81 @@
-import { doc, setDoc, getDoc } from "firebase/firestore";
-import { db } from "./firebase";
+import { supabase } from "./supabase";
 
 const ADMIN_EMAIL = "kmkrphd@gmail.com";
 
 /**
  * Save user profile with role
+ * Called after registration/login to ensure profile exists
  */
 export const saveUserProfile = async (user) => {
   const role = user.email === ADMIN_EMAIL ? "admin" : "author";
 
-  await setDoc(doc(db, "users", user.uid), {
+  const { error } = await supabase.from("users").upsert({
+    id: user.id,
     email: user.email,
-    role,
-    createdAt: new Date(),
-  }, { merge: true }); // ✅ merge so it doesn't overwrite reviewer role
+    role
+  }, { onConflict: "id", ignoreDuplicates: false });
 
+  if (error) throw error;
   return role;
 };
 
 /**
- * Get user role — falls back to email check if Firestore doc missing
+ * Get user role from public.users
  */
 export const getUserRole = async (uid) => {
   try {
-    const snap = await getDoc(doc(db, "users", uid));
+    const { data, error } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", uid)
+      .single();
 
-    if (snap.exists()) {
-      return snap.data().role;
+    if (error || !data) {
+      // Fallback — recreate profile
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const role = user.email === ADMIN_EMAIL ? "admin" : "author";
+        await supabase.from("users").upsert({
+          id: user.id,
+          email: user.email,
+          role
+        });
+        return role;
+      }
+      return null;
     }
 
-    // ✅ Doc missing (e.g. DB was wiped) — recreate it based on email
-    const { auth } = await import("./firebase");
-    const user = auth.currentUser;
-    if (user) {
-      const role = user.email === ADMIN_EMAIL ? "admin" : "author";
-      await setDoc(doc(db, "users", uid), {
-        email: user.email,
-        role,
-        createdAt: new Date(),
-      });
-      return role;
-    }
-
-    return null;
+    return data.role;
   } catch (error) {
     console.error("Error getting user role:", error);
-    // ✅ Last resort — check email directly
-    const { auth } = await import("./firebase");
-    const user = auth.currentUser;
+    const { data: { user } } = await supabase.auth.getUser();
     if (user?.email === ADMIN_EMAIL) return "admin";
     return "author";
   }
+};
+
+/**
+ * Get full user profile
+ */
+export const getUserProfile = async (uid) => {
+  const { data, error } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", uid)
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+/**
+ * Update user profile
+ */
+export const updateUserProfile = async (uid, updates) => {
+  const { error } = await supabase
+    .from("users")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", uid);
+
+  if (error) throw error;
 };

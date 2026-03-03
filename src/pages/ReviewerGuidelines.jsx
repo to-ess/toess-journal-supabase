@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import {
   Users,
   Shield,
@@ -13,65 +12,7 @@ import {
 
 import SidebarLayout from "../layouts/SidebarLayout";
 
-/* -------------------- Custom Styles -------------------- */
-const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
-
-  .rg-root { font-family: 'DM Sans', sans-serif; }
-  .rg-root h1, .rg-root h2, .rg-root h3 { font-family: 'Crimson Pro', serif; }
-
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(22px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  .rg-a1 { animation: fadeUp 0.6s ease 0.05s both; }
-
-  .reveal {
-    opacity: 0;
-    transform: translateY(20px);
-    transition: opacity 0.55s ease, transform 0.55s ease;
-  }
-
-  .reveal.visible {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  .guide-card {
-    transition: transform 0.22s ease, box-shadow 0.22s ease;
-  }
-
-  .guide-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 30px rgba(29,78,216,0.08);
-  }
-`;
-
-/* -------------------- Reveal Animation -------------------- */
-function initReveal() {
-  const check = () => {
-    document.querySelectorAll(".reveal").forEach((el) => {
-      if (el.getBoundingClientRect().top < window.innerHeight - 60) {
-        el.classList.add("visible");
-      }
-    });
-  };
-
-  check();
-  window.addEventListener("scroll", check, { passive: true });
-
-  return () => window.removeEventListener("scroll", check);
-}
-
-/* ==================== Component ==================== */
-
 export default function ReviewerGuidelines() {
-  useEffect(() => {
-    const cleanup = initReveal();
-    return cleanup;
-  }, []);
-
   const sections = [
     {
       icon: FileSearch,
@@ -134,15 +75,14 @@ export default function ReviewerGuidelines() {
       subtitle="Essential Information for Peer Reviewers at ToESS"
       icon={Users}
     >
-      <div className="rg-root space-y-10">
-        <style>{STYLES}</style>
+      <div className="space-y-10">
 
         {/* Overview */}
-        <div className="rg-a1 bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 p-8">
           <h2 className="text-2xl font-bold text-slate-900 mb-4">
             The Role of Peer Reviewers
           </h2>
-          <p className="text-slate-600 leading-relaxed">
+          <p className="text-slate-700 leading-relaxed">
             Reviewers play a crucial role in maintaining the academic integrity
             and quality of published research. Your expertise ensures that
             innovative, rigorous, and ethical research contributes meaningfully
@@ -150,46 +90,47 @@ export default function ReviewerGuidelines() {
           </p>
         </div>
 
-        {/* Review Sections */}
-        <div className="reveal space-y-4">
-          <h2 className="text-2xl font-bold text-slate-900 mb-4">
+        {/* Review Process Guidelines */}
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-6">
             Review Process Guidelines
           </h2>
 
-          {sections.map((section, i) => {
-            const Icon = section.icon;
-            return (
-              <div
-                key={i}
-                className="guide-card bg-white rounded-xl border border-slate-200 shadow-sm p-6"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <Icon size={18} className="text-indigo-600" />
-                  <h3 className="font-bold text-slate-900">
-                    {section.title}
-                  </h3>
+          <div className="space-y-4">
+            {sections.map((section, i) => {
+              const Icon = section.icon;
+              return (
+                <div
+                  key={i}
+                  className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md hover:border-indigo-300 transition-all"
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Icon size={16} className="text-indigo-600" />
+                    </div>
+                    <h3 className="font-bold text-slate-900">{section.title}</h3>
+                  </div>
+                  <p className="text-slate-600 text-sm leading-relaxed pl-11">
+                    {section.content}
+                  </p>
                 </div>
-                <p className="text-slate-600 text-sm leading-relaxed">
-                  {section.content}
-                </p>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
 
         {/* Evaluation Criteria */}
-        <div className="reveal bg-gradient-to-br from-indigo-900 to-blue-900 rounded-2xl p-8 text-white shadow-xl">
-          <h3 className="text-2xl font-bold mb-6">
+        <div className="bg-gradient-to-r from-indigo-900 to-blue-900 rounded-2xl p-8 text-white shadow-xl">
+          <h2 className="text-2xl font-bold mb-6">
             Manuscript Evaluation Criteria
-          </h3>
-
+          </h2>
           <div className="grid md:grid-cols-2 gap-4">
             {criteria.map((item, i) => (
               <div
                 key={i}
                 className="flex items-center gap-3 bg-white/10 rounded-lg px-4 py-3 border border-white/20"
               >
-                <CheckCircle size={16} className="text-emerald-400" />
+                <CheckCircle size={16} className="text-emerald-400 flex-shrink-0" />
                 <span className="text-sm">{item}</span>
               </div>
             ))}
@@ -197,21 +138,22 @@ export default function ReviewerGuidelines() {
         </div>
 
         {/* Contact */}
-        <div className="reveal bg-blue-50 border border-blue-200 rounded-2xl p-6">
-          <div className="flex items-start gap-3">
-            <Mail size={18} className="text-blue-600 mt-1" />
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Mail size={18} className="text-blue-600" />
+            </div>
             <div>
-              <h4 className="font-bold text-slate-900 mb-1">
-                Need Assistance?
-              </h4>
-              <p className="text-sm text-slate-600 mb-3">
+              <h4 className="font-bold text-slate-900 mb-1">Need Assistance?</h4>
+              <p className="text-sm text-slate-600 mb-4">
                 Contact the editorial office for queries regarding review
                 submissions or technical issues.
               </p>
               <a
                 href="/contact"
-                className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition"
               >
+                <Mail size={14} />
                 Contact Editorial Office
               </a>
             </div>
@@ -219,19 +161,20 @@ export default function ReviewerGuidelines() {
         </div>
 
         {/* Important Notice */}
-        <div className="reveal flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-5">
-          <AlertCircle size={18} className="text-amber-600 mt-1" />
+        <div className="flex items-start gap-4 bg-amber-50 border border-amber-200 rounded-2xl p-6">
+          <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <AlertCircle size={18} className="text-amber-600" />
+          </div>
           <div>
-            <h4 className="font-bold text-amber-900 mb-1">
-              Important Notice
-            </h4>
-            <p className="text-sm text-amber-800">
+            <h4 className="font-bold text-amber-900 mb-1">Important Notice</h4>
+            <p className="text-sm text-amber-800 leading-relaxed">
               All manuscripts are confidential documents. Do not share,
               reproduce, or distribute review materials without written
               permission from the Editor-in-Chief.
             </p>
           </div>
         </div>
+
       </div>
     </SidebarLayout>
   );

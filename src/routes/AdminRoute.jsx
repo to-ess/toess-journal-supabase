@@ -1,20 +1,26 @@
+import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
-import { auth } from "../services/firebase";
+import { supabase } from "../services/supabase";
 
 const ADMIN_EMAIL = "kmkrphd@gmail.com";
 
 export default function AdminRoute({ children }) {
-  const user = auth.currentUser;
+  const [user, setUser] = useState(undefined); // undefined = still loading
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user || null);
+    });
+  }, []);
 
-  // ✅ Check email directly — same logic as Firestore rules
-  // No Firestore lookup needed, so wiping the DB won't break admin access
-  if (user.email !== ADMIN_EMAIL) {
-    return <Navigate to="/dashboard/author" replace />;
-  }
+  // Still checking auth — show nothing
+  if (user === undefined) return null;
+
+  // Not logged in
+  if (!user) return <Navigate to="/login" replace />;
+
+  // Logged in but not admin
+  if (user.email !== ADMIN_EMAIL) return <Navigate to="/dashboard/author" replace />;
 
   return children;
 }

@@ -12,15 +12,16 @@ export default function AdminSubmissions() {
     getAllSubmissions().then(setSubmissions);
   }, []);
 
-  const filtered = submissions.filter(s => s.status === filter);
+  const filtered = submissions.filter(s =>
+    filter === "all" ? true : s.status === filter
+  );
 
   const publish = async (id) => {
     await updateSubmission(id, {
-      status: "approved",
-      isPublished: true,
-      volume: "1",
-      issue: "1",
-      doi: `10.1234/toess.${id.slice(0, 5)}`,
+      // In the current schema, "published" is the
+      // final state that makes a paper visible in
+      // the public Archives.
+      status: "published",
     });
     getAllSubmissions().then(setSubmissions);
   };
@@ -30,7 +31,7 @@ export default function AdminSubmissions() {
       <h1 className="text-3xl font-bold mb-6">Admin Submissions</h1>
 
       <div className="flex gap-3 mb-6">
-        {["submitted", "minor_revision", "major_revision", "approved", "rejected"].map(s => (
+        {["all", "submitted", "under_review", "revision_requested", "accepted", "rejected", "published"].map(s => (
           <button
             key={s}
             onClick={() => setFilter(s)}
@@ -38,7 +39,7 @@ export default function AdminSubmissions() {
               filter === s ? "bg-indigo-600 text-white" : "bg-gray-200"
             }`}
           >
-            {s.replace("_", " ").toUpperCase()}
+            {s === "all" ? "ALL" : s.replace("_", " ").toUpperCase()}
           </button>
         ))}
       </div>
@@ -51,10 +52,18 @@ export default function AdminSubmissions() {
 
             {p.status === "submitted" && (
               <div className="mt-4 flex gap-2">
-                <button onClick={() => updateSubmission(p.id, { status: "minor_revision" })}>Minor</button>
-                <button onClick={() => updateSubmission(p.id, { status: "major_revision" })}>Major</button>
-                <button onClick={() => publish(p.id)}>Approve & Publish</button>
-                <button onClick={() => updateSubmission(p.id, { status: "rejected" })}>Reject</button>
+                <button onClick={() => updateSubmission(p.id, { status: "revision_requested" })}>
+                  Request Revision
+                </button>
+                <button onClick={() => updateSubmission(p.id, { status: "accepted" })}>
+                  Accept
+                </button>
+                <button onClick={() => publish(p.id)}>
+                  Publish
+                </button>
+                <button onClick={() => updateSubmission(p.id, { status: "rejected" })}>
+                  Reject
+                </button>
               </div>
             )}
           </div>

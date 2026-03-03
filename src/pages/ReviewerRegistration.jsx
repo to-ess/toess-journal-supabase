@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { auth } from "../services/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { supabase } from "../services/supabase";
 import { registerAsReviewer, getReviewerRequestStatus } from "../services/reviewerService";
 import { User, BookOpen, Award, Briefcase, Link, CheckCircle, Clock, XCircle } from "lucide-react";
 
@@ -31,27 +30,28 @@ export default function ReviewerRegistration() {
   });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        navigate("/login");
-        return;
-      }
+    const init = async () => {
+      // ✅ Use supabase.auth.getUser() directly instead of observeAuth
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { navigate("/login"); return; }
+
       setCurrentUser(user);
       setForm(prev => ({
         ...prev,
-        fullName: user.displayName || "",
         email: user.email || ""
       }));
+
       try {
-        const request = await getReviewerRequestStatus(user.uid);
+        // ✅ user.id not user.uid
+        const request = await getReviewerRequestStatus(user.id);
         setExistingRequest(request);
       } catch (err) {
         console.error(err);
       } finally {
         setLoading(false);
       }
-    });
-    return () => unsubscribe();
+    };
+    init();
   }, []);
 
   const handleExpertiseToggle = (topic) => {
@@ -71,8 +71,9 @@ export default function ReviewerRegistration() {
     }
     setSubmitting(true);
     try {
-      await registerAsReviewer(currentUser.uid, form);
-      const request = await getReviewerRequestStatus(currentUser.uid);
+      // ✅ user.id not user.uid
+      await registerAsReviewer(currentUser.id, form);
+      const request = await getReviewerRequestStatus(currentUser.id);
       setExistingRequest(request);
     } catch (err) {
       console.error(err);
@@ -88,7 +89,6 @@ export default function ReviewerRegistration() {
     </div>
   );
 
-  // Already submitted — show status
   if (existingRequest) return (
     <div className="max-w-2xl mx-auto px-6 py-16 text-center">
       <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-6 ${
@@ -108,15 +108,13 @@ export default function ReviewerRegistration() {
         {existingRequest.status === "approved"
           ? "You can now access your reviewer dashboard to see assigned papers."
           : existingRequest.status === "rejected"
-          ? `Reason: ${existingRequest.rejectionReason || "Not specified"}.`
+          ? `Reason: ${existingRequest.rejection_reason || "Not specified"}.`
           : "Your application is being reviewed. You'll be notified once a decision is made."}
       </p>
       <div className="bg-gray-50 rounded-xl p-6 text-left mb-6 text-sm text-gray-600 space-y-2">
-        <p><span className="font-medium">Name:</span> {existingRequest.fullName}</p>
         <p><span className="font-medium">Institution:</span> {existingRequest.institution}</p>
         <p><span className="font-medium">Designation:</span> {existingRequest.designation}</p>
-        <p><span className="font-medium">Expertise:</span> {existingRequest.expertise?.join(", ")}</p>
-        <p><span className="font-medium">Submitted:</span> {existingRequest.submittedAt?.toDate?.().toLocaleDateString()}</p>
+        <p><span className="font-medium">Submitted:</span> {existingRequest.created_at ? new Date(existingRequest.created_at).toLocaleDateString() : "N/A"}</p>
       </div>
       {existingRequest.status === "approved" && (
         <button onClick={() => navigate("/reviewer/dashboard")}

@@ -1,15 +1,11 @@
 import { useState } from "react";
-import {
-  EmailAuthProvider,
-  reauthenticateWithCredential,
-  updatePassword,
-} from "firebase/auth";
-import { auth } from "../../services/firebase";
+
+import { supabase } from "../../services/supabase";
 import { AlertCircle, CheckCircle, Lock, Eye, EyeOff, Shield, Key } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function ChangePassword() {
-  const user = auth.currentUser;
+  const user = supabase.auth.getUser();
   const navigate = useNavigate();
 
   const [currentPassword, setCurrentPassword] = useState("");

@@ -12,6 +12,10 @@ import Scope from "./pages/Scope";
 import Guidelines from "./pages/Guidelines";
 import Contact from "./pages/Contact";
 import EditorialBoard from "./pages/EditorialBoard";
+import CurrentIssue from "./pages/CurrentIssue";
+
+/* ================= AUTH ================= */
+import AuthCallback from "./pages/AuthCallback";
 
 /* ================= USEFUL / SIDEBAR ================= */
 import PlagiarismPolicy from "./pages/PlagiarismPolicy";
@@ -19,6 +23,14 @@ import PeerReview from "./pages/PeerReview";
 import SpecialIssue from "./pages/SpecialIssue";
 import ReviewerGuidelines from "./pages/ReviewerGuidelines";
 import Indexing from "./pages/Indexing";
+
+/* ================= POLICY & LEGAL PAGES ================= */
+import PublicationPolicy from "./pages/PublicationPolicy";
+import CopyrightPolicy from "./pages/CopyrightPolicy";
+import FAQs from "./pages/FAQs";
+import Disclaimer from "./pages/Disclaimer";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsofService from "./pages/TermsofService";
 
 /* ================= SETTINGS ================= */
 import ProfileSettings from "./pages/settings/ProfileSettings";
@@ -51,45 +63,26 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import AdminRoute from "./routes/AdminRoute";
 import MainLayout from "./layouts/MainLayout";
 
-/* ─────────────────────────────────────────
-   Global animation styles injected once
-───────────────────────────────────────── */
 const GLOBAL_STYLES = `
-  /* Page enter animation */
   @keyframes pageEnter {
-    from {
-      opacity: 0;
-      transform: translateY(16px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
-
-  /* Subtle top progress bar */
   @keyframes progressBar {
     from { transform: scaleX(0); }
     to   { transform: scaleX(1); }
   }
-
-  /* Progress bar fade out */
   @keyframes progressFade {
     0%   { opacity: 1; }
     80%  { opacity: 1; }
     100% { opacity: 0; }
   }
-
   .page-transition {
     animation: pageEnter 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
-
-  /* Top loading bar */
   .progress-bar {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
+    top: 0; left: 0; right: 0;
     height: 2.5px;
     background: linear-gradient(90deg, #1d4ed8, #6366f1, #3b82f6);
     transform-origin: left;
@@ -102,43 +95,23 @@ const GLOBAL_STYLES = `
   }
 `;
 
-/* ─────────────────────────────────────────
-   Scroll to top + page transition wrapper
-───────────────────────────────────────── */
 function PageTransition({ children }) {
   const { pathname } = useLocation();
   const barRef = useRef(null);
 
   useLayoutEffect(() => {
-    // Instant scroll reset
     window.scrollTo({ top: 0, behavior: "instant" });
-
-    // Inject progress bar
     const bar = document.createElement("div");
     bar.className = "progress-bar";
     document.body.appendChild(bar);
     barRef.current = bar;
-
-    const timer = setTimeout(() => {
-      bar.remove();
-    }, 900);
-
-    return () => {
-      clearTimeout(timer);
-      bar.remove();
-    };
+    const timer = setTimeout(() => bar.remove(), 900);
+    return () => { clearTimeout(timer); bar.remove(); };
   }, [pathname]);
 
-  return (
-    <div key={pathname} className="page-transition">
-      {children}
-    </div>
-  );
+  return <div key={pathname} className="page-transition">{children}</div>;
 }
 
-/* ─────────────────────────────────────────
-   Inject global styles once on mount
-───────────────────────────────────────── */
 function GlobalStyles() {
   useEffect(() => {
     const id = "app-global-styles";
@@ -159,6 +132,9 @@ export default function App() {
       <PageTransition>
         <Routes>
 
+          {/* ================= AUTH CALLBACK — no layout, handles OAuth redirect ================= */}
+          <Route path="/auth/callback" element={<AuthCallback />} />
+
           {/* ================= PUBLIC ================= */}
           <Route path="/" element={<MainLayout><Home /></MainLayout>} />
           <Route path="/login" element={<MainLayout><Login /></MainLayout>} />
@@ -170,6 +146,7 @@ export default function App() {
           <Route path="/guidelines" element={<MainLayout><Guidelines /></MainLayout>} />
           <Route path="/contact" element={<MainLayout><Contact /></MainLayout>} />
           <Route path="/editorial-board" element={<MainLayout><EditorialBoard /></MainLayout>} />
+          <Route path="/current-issue" element={<MainLayout><CurrentIssue /></MainLayout>} />
 
           {/* ================= USEFUL ================= */}
           <Route path="/plagiarism-policy" element={<MainLayout><PlagiarismPolicy /></MainLayout>} />
@@ -178,14 +155,20 @@ export default function App() {
           <Route path="/reviewer-guidelines" element={<MainLayout><ReviewerGuidelines /></MainLayout>} />
           <Route path="/indexing" element={<MainLayout><Indexing /></MainLayout>} />
 
+          {/* ================= POLICY & LEGAL ================= */}
+          <Route path="/publication-policy" element={<MainLayout><PublicationPolicy /></MainLayout>} />
+          <Route path="/copyright-policy" element={<MainLayout><CopyrightPolicy /></MainLayout>} />
+          <Route path="/faqs" element={<MainLayout><FAQs /></MainLayout>} />
+          <Route path="/disclaimer" element={<MainLayout><Disclaimer /></MainLayout>} />
+          <Route path="/privacy-policy" element={<MainLayout><PrivacyPolicy /></MainLayout>} />
+          <Route path="/terms-of-service" element={<MainLayout><TermsofService /></MainLayout>} />
+
           {/* ================= REVIEWER REGISTRATION ================= */}
           <Route
             path="/reviewer-registration"
             element={
               <ProtectedRoute>
-                <MainLayout>
-                  <ReviewerRegistration />
-                </MainLayout>
+                <MainLayout><ReviewerRegistration /></MainLayout>
               </ProtectedRoute>
             }
           />

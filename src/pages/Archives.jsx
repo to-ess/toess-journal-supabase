@@ -23,24 +23,17 @@ export default function Archives() {
   const [papers, setPapers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [selectedVolume, setSelectedVolume] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
   const [selectedPaper, setSelectedPaper] = useState(null);
-  const [viewMode, setViewMode] = useState("grid"); // grid or list
 
   /* ================= FORMAT AUTHORS ================= */
-  const formatAuthors = (authors) => {
-    if (!authors) return "Unknown author";
-    if (typeof authors === "string") return authors;
-    if (Array.isArray(authors)) {
-      return authors
-        .map(a =>
-          `${a.prefix || ""} ${a.firstName || ""} ${a.lastName || ""}`
-            .replace(/\s+/g, " ")
-            .trim()
-        )
-        .join(", ");
+  const formatAuthors = (paper) => {
+    if (paper.paper_authors && Array.isArray(paper.paper_authors) && paper.paper_authors.length > 0) {
+      return paper.paper_authors.map(a => a.full_name).join(", ");
+    }
+    if (paper.users) {
+      return `${paper.users.given_name || ""} ${paper.users.family_name || ""}`.trim();
     }
     return "Unknown author";
   };
@@ -78,22 +71,23 @@ export default function Archives() {
   };
 
   /* ================= FILTERING ================= */
-  const volumes = [...new Set(papers.map(p => p.volume).filter(Boolean))].sort((a, b) => b - a);
   const categories = [...new Set(papers.map(p => p.category).filter(Boolean))].sort();
 
   let filtered = papers.filter((p) => {
-    const authorText = formatAuthors(p.authors || p.authorName).toLowerCase();
+    const authorText = formatAuthors(p).toLowerCase();
+    const keywordsText = Array.isArray(p.keywords) 
+      ? p.keywords.join(" ").toLowerCase()
+      : typeof p.keywords === "string"
+      ? p.keywords.toLowerCase()
+      : "";
+    
     return (
       p.title?.toLowerCase().includes(search.toLowerCase()) ||
       authorText.includes(search.toLowerCase()) ||
-      p.keywords?.join(" ").toLowerCase().includes(search.toLowerCase()) ||
+      keywordsText.includes(search.toLowerCase()) ||
       p.abstract?.toLowerCase().includes(search.toLowerCase())
     );
   });
-
-  if (selectedVolume !== "all") {
-    filtered = filtered.filter(p => p.volume === parseInt(selectedVolume));
-  }
 
   if (selectedCategory !== "all") {
     filtered = filtered.filter(p => p.category === selectedCategory);
@@ -102,25 +96,29 @@ export default function Archives() {
   filtered.sort((a, b) => {
     if (sortBy === "title")
       return (a.title || "").localeCompare(b.title || "");
-    const dateA = a.publicationDate || a.createdAt || 0;
-    const dateB = b.publicationDate || b.createdAt || 0;
+    
+    const dateA = new Date(a.updated_at || a.created_at || 0).getTime();
+    const dateB = new Date(b.updated_at || b.created_at || 0).getTime();
     return sortBy === "oldest" ? dateA - dateB : dateB - dateA;
   });
 
   /* ================= STATS ================= */
   const stats = {
     total: papers.length,
-    volumes: volumes.length,
-    categories: categories.length
+    categories: categories.length,
+    thisYear: papers.filter(p => {
+      const year = new Date(p.updated_at || p.created_at).getFullYear();
+      return year === new Date().getFullYear();
+    }).length
   };
 
   /* ================= LOADING ================= */
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
+      <div className="flex justify-center items-center h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading publications...</p>
+          <p className="text-gray-600 font-medium">Loading publications...</p>
         </div>
       </div>
     );
@@ -155,10 +153,10 @@ export default function Archives() {
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
               <div className="flex items-center gap-3">
-                <BookOpen className="w-8 h-8 text-blue-200" />
+                <TrendingUp className="w-8 h-8 text-blue-200" />
                 <div>
-                  <div className="text-3xl font-bold">{stats.volumes}</div>
-                  <div className="text-sm text-blue-200">Volumes</div>
+                  <div className="text-3xl font-bold">{stats.thisYear}</div>
+                  <div className="text-sm text-blue-200">This Year</div>
                 </div>
               </div>
             </div>
@@ -196,17 +194,6 @@ export default function Archives() {
               <Filter className="w-4 h-4" />
               Filters:
             </div>
-
-            <select
-              value={selectedVolume}
-              onChange={(e) => setSelectedVolume(e.target.value)}
-              className="border-2 border-gray-200 px-4 py-2 rounded-lg focus:border-indigo-500 focus:outline-none transition"
-            >
-              <option value="all">All Volumes</option>
-              {volumes.map(v => (
-                <option key={v} value={v}>Volume {v}</option>
-              ))}
-            </select>
 
             <select
               value={selectedCategory}
@@ -264,17 +251,12 @@ export default function Archives() {
                   <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
                     <span className="flex items-center gap-1.5">
                       <Users className="w-4 h-4 text-gray-400" />
-                      {formatAuthors(p.authors || p.authorName)}
+                      {formatAuthors(p)}
                     </span>
                     
                     <span className="flex items-center gap-1.5">
                       <Calendar className="w-4 h-4 text-gray-400" />
-                      {formatDate(p.publicationDate || p.createdAt)}
-                    </span>
-
-                    <span className="flex items-center gap-1.5">
-                      <BookOpen className="w-4 h-4 text-gray-400" />
-                      Vol. {p.volume || "-"}, Issue {p.issue || "-"}
+                      {formatDate(p.updated_at || p.created_at)}
                     </span>
                   </div>
 
@@ -295,17 +277,19 @@ export default function Archives() {
               )}
 
               {/* Keywords */}
-              {p.keywords && p.keywords.length > 0 && (
+              {p.keywords && (Array.isArray(p.keywords) ? p.keywords.length : 0) > 0 && (
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {p.keywords.slice(0, 5).map((kw, idx) => (
-                    <span
-                      key={idx}
-                      className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs"
-                    >
-                      <Tag className="w-3 h-3" />
-                      {kw}
-                    </span>
-                  ))}
+                  {(Array.isArray(p.keywords) ? p.keywords : p.keywords.split(","))
+                    .slice(0, 5)
+                    .map((kw, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs"
+                      >
+                        <Tag className="w-3 h-3" />
+                        {typeof kw === "string" ? kw.trim() : kw}
+                      </span>
+                    ))}
                 </div>
               )}
 
@@ -319,24 +303,16 @@ export default function Archives() {
                   View Details
                 </button>
 
-                {p.fileUrl && (
-                  <button
-                    onClick={() => window.open(p.fileUrl, '_blank')}
+                {p.file_url && (
+                  <a
+                    href={p.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition font-medium text-sm shadow-sm"
                   >
                     <Download className="w-4 h-4" />
                     Download PDF
-                  </button>
-                )}
-
-                {p.doi && (
-                  <button
-                    onClick={() => window.open(`https://doi.org/${p.doi}`, '_blank')}
-                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 hover:border-indigo-600 hover:text-indigo-600 text-gray-700 rounded-lg transition font-medium text-sm"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    DOI
-                  </button>
+                  </a>
                 )}
               </div>
             </article>
@@ -358,11 +334,11 @@ export default function Archives() {
                   <div className="flex flex-wrap gap-4 text-sm text-blue-100">
                     <span className="flex items-center gap-1.5">
                       <Users className="w-4 h-4" />
-                      {formatAuthors(selectedPaper.authors || selectedPaper.authorName)}
+                      {formatAuthors(selectedPaper)}
                     </span>
                     <span className="flex items-center gap-1.5">
                       <Calendar className="w-4 h-4" />
-                      {formatDate(selectedPaper.publicationDate || selectedPaper.createdAt)}
+                      {formatDate(selectedPaper.updated_at || selectedPaper.created_at)}
                     </span>
                   </div>
                 </div>
@@ -379,26 +355,28 @@ export default function Archives() {
             <div className="p-6 space-y-6">
               {/* Publication Info */}
               <div className="grid md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <span className="text-sm font-semibold text-gray-600">Volume & Issue</span>
-                  <p className="text-gray-900">Volume {selectedPaper.volume || "-"}, Issue {selectedPaper.issue || "-"}</p>
-                </div>
                 {selectedPaper.category && (
                   <div>
                     <span className="text-sm font-semibold text-gray-600">Category</span>
                     <p className="text-gray-900">{selectedPaper.category}</p>
                   </div>
                 )}
-                {selectedPaper.doi && (
+                {selectedPaper.article_type && (
                   <div>
-                    <span className="text-sm font-semibold text-gray-600">DOI</span>
-                    <p className="text-gray-900 text-sm">{selectedPaper.doi}</p>
+                    <span className="text-sm font-semibold text-gray-600">Article Type</span>
+                    <p className="text-gray-900">{selectedPaper.article_type}</p>
                   </div>
                 )}
-                {selectedPaper.pages && (
+                {selectedPaper.status === "published" && (
                   <div>
-                    <span className="text-sm font-semibold text-gray-600">Pages</span>
-                    <p className="text-gray-900">{selectedPaper.pages}</p>
+                    <span className="text-sm font-semibold text-gray-600">Status</span>
+                    <p className="text-gray-900">Published</p>
+                  </div>
+                )}
+                {selectedPaper.updated_at && (
+                  <div>
+                    <span className="text-sm font-semibold text-gray-600">Published Date</span>
+                    <p className="text-gray-900">{formatDate(selectedPaper.updated_at)}</p>
                   </div>
                 )}
               </div>
@@ -414,39 +392,41 @@ export default function Archives() {
               )}
 
               {/* Keywords */}
-              {selectedPaper.keywords && selectedPaper.keywords.length > 0 && (
+              {selectedPaper.keywords && (Array.isArray(selectedPaper.keywords) ? selectedPaper.keywords.length : 0) > 0 && (
                 <div>
                   <h3 className="text-lg font-bold text-gray-900 mb-3">Keywords</h3>
                   <div className="flex flex-wrap gap-2">
-                    {selectedPaper.keywords.map((kw, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-full text-sm font-medium"
-                      >
-                        <Tag className="w-3 h-3" />
-                        {kw}
-                      </span>
-                    ))}
+                    {(Array.isArray(selectedPaper.keywords) ? selectedPaper.keywords : selectedPaper.keywords.split(","))
+                      .map((kw, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-full text-sm font-medium"
+                        >
+                          <Tag className="w-3 h-3" />
+                          {typeof kw === "string" ? kw.trim() : kw}
+                        </span>
+                      ))}
                   </div>
                 </div>
               )}
 
               {/* Authors Details */}
-              {Array.isArray(selectedPaper.authors) && selectedPaper.authors.length > 0 && (
+              {selectedPaper.paper_authors && selectedPaper.paper_authors.length > 0 && (
                 <div>
                   <h3 className="text-lg font-bold text-gray-900 mb-3">Authors</h3>
                   <div className="space-y-3">
-                    {selectedPaper.authors.map((author, idx) => (
+                    {selectedPaper.paper_authors.map((author, idx) => (
                       <div key={idx} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                         <div className="w-10 h-10 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold">
-                          {(author.firstName?.[0] || '?').toUpperCase()}
+                          {(author.full_name?.[0] || '?').toUpperCase()}
                         </div>
                         <div>
                           <p className="font-semibold text-gray-900">
-                            {author.prefix} {author.firstName} {author.lastName}
+                            {author.full_name}
+                            {author.is_corresponding && <span className="text-xs text-indigo-600 ml-2">(Corresponding)</span>}
                           </p>
-                          {author.affiliation && (
-                            <p className="text-sm text-gray-600">{author.affiliation}</p>
+                          {author.institution && (
+                            <p className="text-sm text-gray-600">{author.institution}</p>
                           )}
                           {author.email && (
                             <p className="text-sm text-gray-500">{author.email}</p>
@@ -467,24 +447,16 @@ export default function Archives() {
                   Close
                 </button>
 
-                {selectedPaper.fileUrl && (
-                  <button
-                    onClick={() => window.open(selectedPaper.fileUrl, '_blank')}
+                {selectedPaper.file_url && (
+                  <a
+                    href={selectedPaper.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition font-medium shadow-lg"
                   >
                     <Download className="w-5 h-5" />
                     Download Full Paper
-                  </button>
-                )}
-
-                {selectedPaper.doi && (
-                  <button
-                    onClick={() => window.open(`https://doi.org/${selectedPaper.doi}`, '_blank')}
-                    className="flex items-center gap-2 px-6 py-3 border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50 rounded-lg transition font-medium"
-                  >
-                    <ExternalLink className="w-5 h-5" />
-                    View DOI
-                  </button>
+                  </a>
                 )}
               </div>
             </div>

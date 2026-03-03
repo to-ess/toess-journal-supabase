@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { auth } from "../../services/firebase";
+import { supabase } from "../../services/supabase";
 import { getMySubmissions } from "../../services/submissionService";
 
 export default function MySubmissions() {
@@ -8,7 +8,7 @@ export default function MySubmissions() {
 
   useEffect(() => {
     const load = async () => {
-      const user = auth.currentUser;
+      const user = supabase.auth.getUser();
       if (!user) return;
 
       const data = await getMySubmissions(user.uid);

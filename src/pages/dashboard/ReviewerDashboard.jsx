@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { auth } from "../../services/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { observeAuth } from "../../services/authService";
 import { getReviewerAssignments, submitReview } from "../../services/reviewerService";
 import {
   FileText, Clock, CheckCircle, Star, Send, X,
@@ -27,13 +26,11 @@ function StarRating({ value, onChange, label }) {
   );
 }
 
-// ✅ Paper detail panel shown when reviewer expands a paper
 function PaperDetails({ paper }) {
   if (!paper) return <p className="text-sm text-gray-500 italic">Paper details not available.</p>;
 
   return (
     <div className="mt-4 pt-4 border-t space-y-4">
-      {/* Author info */}
       <div className="flex flex-wrap gap-4 text-sm text-gray-600">
         {(paper.authorName || paper.authorEmail) && (
           <span className="flex items-center gap-1.5">
@@ -49,7 +46,6 @@ function PaperDetails({ paper }) {
         )}
       </div>
 
-      {/* Abstract */}
       {paper.abstract ? (
         <div>
           <p className="text-sm font-semibold text-gray-700 mb-1">Abstract</p>
@@ -59,7 +55,6 @@ function PaperDetails({ paper }) {
         <p className="text-sm text-gray-400 italic">No abstract available.</p>
       )}
 
-      {/* Keywords */}
       {paper.keywords?.length > 0 && (
         <div>
           <p className="text-sm font-semibold text-gray-700 mb-2">Keywords</p>
@@ -71,10 +66,9 @@ function PaperDetails({ paper }) {
         </div>
       )}
 
-      {/* Download link — try both fileUrl and fileURL */}
-      {(paper.fileUrl || paper.fileURL) && (
+      {paper.fileUrl && (
         <a
-          href={paper.fileUrl || paper.fileURL}
+          href={paper.fileUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition"
@@ -86,6 +80,18 @@ function PaperDetails({ paper }) {
   );
 }
 
+const EMPTY_FORM = {
+  originalityRating: 0,
+  methodologyRating: 0,
+  clarityRating: 0,
+  overallRating: 0,
+  strengths: "",
+  weaknesses: "",
+  detailedComments: "",
+  confidentialComments: "",
+  recommendation: ""
+};
+
 export default function ReviewerDashboard() {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
@@ -95,14 +101,10 @@ export default function ReviewerDashboard() {
   const [expandedPaper, setExpandedPaper] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [reviewForm, setReviewForm] = useState({
-    originalityRating: 0, methodologyRating: 0, clarityRating: 0,
-    significanceRating: 0, overallRating: 0, strengths: "",
-    weaknesses: "", detailedComments: "", confidentialComments: "", recommendation: ""
-  });
+  const [reviewForm, setReviewForm] = useState(EMPTY_FORM);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = observeAuth((user) => {
       if (!user) { navigate("/login"); return; }
       setCurrentUser(user);
       loadAssignments(user.email);
@@ -113,8 +115,9 @@ export default function ReviewerDashboard() {
   const loadAssignments = async (email) => {
     try {
       const data = await getReviewerAssignments(email);
-      console.log("📋 Assignments loaded:", data); // helpful for debugging
-      setAssignments(data);
+      // ✅ Only keep pending (not yet reviewed) assignments
+      const pending = data.filter(a => a.status !== "completed");
+      setAssignments(pending);
     } catch (err) {
       console.error("Error loading assignments:", err);
     } finally {
@@ -122,16 +125,16 @@ export default function ReviewerDashboard() {
     }
   };
 
-  const resetForm = () => setReviewForm({
-    originalityRating: 0, methodologyRating: 0, clarityRating: 0,
-    significanceRating: 0, overallRating: 0, strengths: "",
-    weaknesses: "", detailedComments: "", confidentialComments: "", recommendation: ""
-  });
+  const resetForm = () => setReviewForm(EMPTY_FORM);
 
   const handleSubmitReview = async (e) => {
     e.preventDefault();
-    const { originalityRating, methodologyRating, clarityRating, significanceRating, overallRating, recommendation } = reviewForm;
-    if (!originalityRating || !methodologyRating || !clarityRating || !significanceRating || !overallRating) {
+    const {
+      originalityRating, methodologyRating, clarityRating,
+      overallRating, recommendation
+    } = reviewForm;
+
+    if (!originalityRating || !methodologyRating || !clarityRating || !overallRating) {
       alert("Please provide all ratings."); return;
     }
     if (!recommendation) { alert("Please select a recommendation."); return; }
@@ -143,7 +146,7 @@ export default function ReviewerDashboard() {
     try {
       await submitReview(selectedAssignment.id, {
         ...reviewForm,
-        paperId: selectedAssignment.paperId,
+        paperId: selectedAssignment.paper_id,
         reviewerEmail: currentUser.email,
         reviewerName: currentUser.displayName || currentUser.email
       });
@@ -153,7 +156,7 @@ export default function ReviewerDashboard() {
         setSubmitSuccess(false);
         setSelectedAssignment(null);
         resetForm();
-        loadAssignments(currentUser.email);
+        loadAssignments(currentUser.email); // ✅ reloads and filters out completed
       }, 1800);
     } catch (err) {
       console.error(err);
@@ -163,9 +166,7 @@ export default function ReviewerDashboard() {
     }
   };
 
-  const isOverdue = (a) => a.deadline?.toDate?.() < new Date();
-  const pending = assignments.filter(a => !a.reviewSubmitted);
-  const completed = assignments.filter(a => a.reviewSubmitted);
+  const isOverdue = (a) => a.deadline && new Date(a.deadline) < new Date();
 
   if (loading) return (
     <div className="flex justify-center items-center h-screen">
@@ -183,10 +184,9 @@ export default function ReviewerDashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 gap-4 mb-8">
         {[
-          { label: "Pending Reviews", value: pending.length, icon: Clock, color: "text-orange-500" },
-          { label: "Completed", value: completed.length, icon: CheckCircle, color: "text-green-500" },
+          { label: "Pending Reviews", value: assignments.length, icon: Clock, color: "text-orange-500" },
           { label: "Total Assigned", value: assignments.length, icon: FileText, color: "text-indigo-500" },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="bg-white p-5 rounded-xl border shadow-sm">
@@ -201,106 +201,72 @@ export default function ReviewerDashboard() {
         ))}
       </div>
 
+      {/* ✅ Only show pending papers — completed papers are hidden */}
       {assignments.length === 0 ? (
         <div className="bg-white rounded-xl border p-12 text-center text-gray-500">
-          <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <p className="text-lg font-medium">No papers assigned yet</p>
-          <p className="text-sm mt-1">You'll see papers here once the admin assigns them to you.</p>
+          <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-300" />
+          <p className="text-lg font-medium">All reviews completed!</p>
+          <p className="text-sm mt-1">You have no pending papers to review.</p>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div>
+          <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-orange-500" /> Papers Awaiting Your Review
+          </h2>
+          <div className="space-y-3">
+            {assignments.map(assignment => {
+              const paper = assignment.paper;
+              const overdue = isOverdue(assignment);
+              const isOpen = expandedPaper === assignment.id;
 
-          {/* Pending */}
-          {pending.length > 0 && (
-            <div>
-              <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-orange-500" /> Pending Reviews
-              </h2>
-              <div className="space-y-3">
-                {pending.map(assignment => {
-                  const paper = assignment.paper;
-                  const overdue = isOverdue(assignment);
-                  const isOpen = expandedPaper === assignment.id;
-
-                  return (
-                    <div key={assignment.id} className={`bg-white rounded-xl border-2 shadow-sm transition ${overdue ? "border-red-200" : "border-gray-100"}`}>
-                      <div className="p-5">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              {/* ✅ Title from paper object */}
-                              <h3 className="font-semibold text-gray-900">
-                                {paper?.title || assignment.paperTitle || "Untitled Paper"}
-                              </h3>
-                              {overdue && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-600 text-xs rounded-full">
-                                  <AlertCircle className="w-3 h-3" /> Overdue
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-gray-500">
-                              Deadline:{" "}
-                              <span className={`font-medium ${overdue ? "text-red-600" : "text-gray-700"}`}>
-                                {assignment.deadline?.toDate?.().toLocaleDateString() ?? "N/A"}
-                              </span>
-                              {" · "}Assigned: {assignment.assignedAt?.toDate?.().toLocaleDateString() ?? "N/A"}
-                            </p>
-                          </div>
-
-                          <div className="flex gap-2 shrink-0">
-                            <button
-                              onClick={() => setExpandedPaper(isOpen ? null : assignment.id)}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition"
-                            >
-                              {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                              {isOpen ? "Hide" : "View"} Details
-                            </button>
-                            <button
-                              onClick={() => { setSelectedAssignment(assignment); resetForm(); }}
-                              className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition"
-                            >
-                              <Send className="w-4 h-4" /> Submit Review
-                            </button>
-                          </div>
+              return (
+                <div key={assignment.id} className={`bg-white rounded-xl border-2 shadow-sm transition ${overdue ? "border-red-200" : "border-gray-100"}`}>
+                  <div className="p-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <h3 className="font-semibold text-gray-900">
+                            {paper?.title || "Untitled Paper"}
+                          </h3>
+                          {overdue && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-600 text-xs rounded-full">
+                              <AlertCircle className="w-3 h-3" /> Overdue
+                            </span>
+                          )}
                         </div>
-
-                        {/* ✅ Expanded paper details */}
-                        {isOpen && <PaperDetails paper={paper} />}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Completed */}
-          {completed.length > 0 && (
-            <div>
-              <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-green-500" /> Completed Reviews
-              </h2>
-              <div className="space-y-3">
-                {completed.map(assignment => (
-                  <div key={assignment.id} className="bg-white rounded-xl border shadow-sm p-5 opacity-80">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">
-                          {assignment.paper?.title || assignment.paperTitle || "Untitled Paper"}
-                        </h3>
-                        <p className="text-sm text-gray-500 mt-0.5">
-                          Submitted: {assignment.completedAt?.toDate?.().toLocaleDateString() ?? "N/A"}
+                        <p className="text-sm text-gray-500">
+                          Deadline:{" "}
+                          <span className={`font-medium ${overdue ? "text-red-600" : "text-gray-700"}`}>
+                            {assignment.deadline ? new Date(assignment.deadline).toLocaleDateString() : "N/A"}
+                          </span>
+                          {" · "}Assigned:{" "}
+                          {assignment.assigned_at ? new Date(assignment.assigned_at).toLocaleDateString() : "N/A"}
                         </p>
                       </div>
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-700 text-sm rounded-full font-medium">
-                        <CheckCircle className="w-4 h-4" /> Review Submitted
-                      </span>
+
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          onClick={() => setExpandedPaper(isOpen ? null : assignment.id)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition"
+                        >
+                          {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          {isOpen ? "Hide" : "View"} Details
+                        </button>
+                        <button
+                          onClick={() => { setSelectedAssignment(assignment); resetForm(); }}
+                          className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition"
+                        >
+                          <Send className="w-4 h-4" /> Submit Review
+                        </button>
+                      </div>
                     </div>
+
+                    {isOpen && <PaperDetails paper={paper} />}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -322,7 +288,6 @@ export default function ReviewerDashboard() {
               </div>
             </div>
 
-            {/* Success state */}
             {submitSuccess ? (
               <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
                 <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
@@ -334,13 +299,18 @@ export default function ReviewerDashboard() {
             ) : (
               <form onSubmit={handleSubmitReview} className="p-6 space-y-6">
                 <div>
-                  <h3 className="font-semibold text-gray-800 mb-4">Ratings <span className="text-gray-400 font-normal text-sm">(1 = Poor, 5 = Excellent)</span></h3>
+                  <h3 className="font-semibold text-gray-800 mb-4">
+                    Ratings <span className="text-gray-400 font-normal text-sm">(1 = Poor, 5 = Excellent)</span>
+                  </h3>
                   <div className="grid grid-cols-2 gap-5">
-                    <StarRating label="Originality" value={reviewForm.originalityRating} onChange={v => setReviewForm(p => ({ ...p, originalityRating: v }))} />
-                    <StarRating label="Methodology" value={reviewForm.methodologyRating} onChange={v => setReviewForm(p => ({ ...p, methodologyRating: v }))} />
-                    <StarRating label="Clarity of Writing" value={reviewForm.clarityRating} onChange={v => setReviewForm(p => ({ ...p, clarityRating: v }))} />
-                    <StarRating label="Significance" value={reviewForm.significanceRating} onChange={v => setReviewForm(p => ({ ...p, significanceRating: v }))} />
-                    <StarRating label="Overall Quality" value={reviewForm.overallRating} onChange={v => setReviewForm(p => ({ ...p, overallRating: v }))} />
+                    <StarRating label="Originality" value={reviewForm.originalityRating}
+                      onChange={v => setReviewForm(p => ({ ...p, originalityRating: v }))} />
+                    <StarRating label="Methodology" value={reviewForm.methodologyRating}
+                      onChange={v => setReviewForm(p => ({ ...p, methodologyRating: v }))} />
+                    <StarRating label="Clarity of Writing" value={reviewForm.clarityRating}
+                      onChange={v => setReviewForm(p => ({ ...p, clarityRating: v }))} />
+                    <StarRating label="Overall Quality" value={reviewForm.overallRating}
+                      onChange={v => setReviewForm(p => ({ ...p, overallRating: v }))} />
                   </div>
                 </div>
 
@@ -348,15 +318,17 @@ export default function ReviewerDashboard() {
                   <h3 className="font-semibold text-gray-800 mb-3">Recommendation</h3>
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { value: "accept", label: "✓ Accept", cls: "border-green-500 bg-green-50 text-green-700" },
+                      { value: "accept",        label: "✓ Accept",         cls: "border-green-500 bg-green-50 text-green-700" },
                       { value: "minor-revision", label: "↻ Minor Revision", cls: "border-blue-500 bg-blue-50 text-blue-700" },
                       { value: "major-revision", label: "↻ Major Revision", cls: "border-orange-500 bg-orange-50 text-orange-700" },
-                      { value: "reject", label: "✕ Reject", cls: "border-red-500 bg-red-50 text-red-700" },
+                      { value: "reject",         label: "✕ Reject",         cls: "border-red-500 bg-red-50 text-red-700" },
                     ].map(opt => (
                       <button key={opt.value} type="button"
                         onClick={() => setReviewForm(p => ({ ...p, recommendation: opt.value }))}
                         className={`p-3 rounded-xl border-2 text-sm font-medium transition ${
-                          reviewForm.recommendation === opt.value ? opt.cls : "border-gray-200 text-gray-600 hover:border-gray-300"
+                          reviewForm.recommendation === opt.value
+                            ? opt.cls
+                            : "border-gray-200 text-gray-600 hover:border-gray-300"
                         }`}>
                         {opt.label}
                       </button>
@@ -366,16 +338,18 @@ export default function ReviewerDashboard() {
 
                 <div className="space-y-4">
                   {[
-                    { key: "strengths", label: "Strengths", placeholder: "Describe the key strengths of this paper...", rows: 3 },
-                    { key: "weaknesses", label: "Weaknesses", placeholder: "Describe areas that need improvement...", rows: 3 },
-                    { key: "detailedComments", label: "Detailed Comments", placeholder: "Provide detailed comments for the authors...", rows: 5 },
-                    { key: "confidentialComments", label: "Confidential Comments (editors only — optional)", placeholder: "Comments only the editor will see...", rows: 3, optional: true },
+                    { key: "strengths",            label: "Strengths",                                       placeholder: "Describe the key strengths of this paper...",  rows: 3 },
+                    { key: "weaknesses",           label: "Weaknesses",                                      placeholder: "Describe areas that need improvement...",      rows: 3 },
+                    { key: "detailedComments",     label: "Detailed Comments",                               placeholder: "Provide detailed comments for the authors...", rows: 5 },
+                    { key: "confidentialComments", label: "Confidential Comments (editors only — optional)", placeholder: "Comments only the editor will see...",          rows: 3, optional: true },
                   ].map(({ key, label, placeholder, rows, optional }) => (
                     <div key={key}>
                       <label className="block text-sm font-semibold text-gray-700 mb-1">
                         {label} {!optional && <span className="text-red-500">*</span>}
                       </label>
-                      <textarea rows={rows} required={!optional}
+                      <textarea
+                        rows={rows}
+                        required={!optional}
                         value={reviewForm[key]}
                         onChange={e => setReviewForm(p => ({ ...p, [key]: e.target.value }))}
                         className="w-full border-2 border-gray-200 rounded-lg px-4 py-2.5 focus:border-indigo-500 focus:outline-none text-sm resize-none"

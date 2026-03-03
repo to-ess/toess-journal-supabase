@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FileText, Clock, CheckCircle, XCircle, Eye, Download, Send, Sparkles, Settings, Users, TrendingUp, UserCheck, RotateCcw } from "lucide-react";
-import { auth } from "../../services/firebase";
+import {
+  FileText, Clock, CheckCircle, XCircle, Eye, Download,
+  Send, Sparkles, Settings, Users, TrendingUp, UserCheck, RotateCcw
+} from "lucide-react";
+import { supabase } from "../../services/supabase";
 import { getAllSubmissions, updateSubmission } from "../../services/submissionService";
 import { getAllAssignments } from "../../services/reviewerService";
-import { sendPaperPublishedEmail } from "../../services/emailService"; // ✅ NEW
+import { sendPaperPublishedEmail } from "../../services/emailService";
 
 export default function AdminDashboard() {
   const [submissions, setSubmissions] = useState([]);
@@ -13,51 +16,53 @@ export default function AdminDashboard() {
   const [filter, setFilter] = useState("all");
   const [selectedPaper, setSelectedPaper] = useState(null);
   const [viewMode, setViewMode] = useState("table");
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (!user) { setLoading(false); return; }
+    const loadData = async () => {
       try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          setLoading(false);
+          setError("Not authenticated");
+          return;
+        }
+
         const [submissionsData, assignmentsData] = await Promise.all([
           getAllSubmissions(),
           getAllAssignments()
         ]);
-        setSubmissions(submissionsData);
-        setAssignments(assignmentsData);
+
+        setSubmissions(submissionsData || []);
+        setAssignments(assignmentsData || []);
+        setError(null);
       } catch (error) {
         console.error("❌ Error fetching data:", error);
+        setError(error.message || "Failed to load data");
+        setSubmissions([]);
+        setAssignments([]);
       } finally {
         setLoading(false);
       }
-    });
-    return () => unsubscribe();
+    };
+    loadData();
   }, []);
 
-  // ✅ publishPaper with email notification
   const publishPaper = async (paper) => {
     try {
+      const doi = `10.1234/toess.v1i1.${paper.id.slice(0, 4)}`;
       const publishData = {
         status: "published",
-        isPublished: true,
-        publishedDate: new Date().toISOString(),
-        volume: 1,
-        issue: 1,
-        doi: `10.1234/toess.v1i1.${paper.id.slice(0, 4)}`
+        updated_at: new Date().toISOString(),
       };
-
       await updateSubmission(paper.id, publishData);
-
-      // ✅ Send published email to author
       await sendPaperPublishedEmail({
-        authorEmail: paper.authorEmail,
-        authorName: paper.authorName,
+        authorEmail: paper.users?.email,
+        authorName: `${paper.users?.given_name || ""} ${paper.users?.family_name || ""}`.trim(),
         paperTitle: paper.title,
-        doi: publishData.doi,
-        volume: publishData.volume,
-        issue: publishData.issue,
+        doi,
       });
-
       setSubmissions(prev =>
         prev.map(p => p.id === paper.id ? { ...p, ...publishData } : p)
       );
@@ -69,12 +74,12 @@ export default function AdminDashboard() {
   };
 
   const STATUS_CONFIG = {
-    submitted:           { label: "Submitted",          color: "bg-amber-50 text-amber-700 border-amber-200",       icon: Clock },
-    "under-review":      { label: "Under Review",       color: "bg-blue-50 text-blue-700 border-blue-200",          icon: Eye },
-    "revision-required": { label: "Revision Required",  color: "bg-orange-50 text-orange-700 border-orange-200",    icon: RotateCcw },
-    accepted:            { label: "Accepted",           color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: CheckCircle },
-    rejected:            { label: "Rejected",           color: "bg-rose-50 text-rose-700 border-rose-200",          icon: XCircle },
-    published:           { label: "Published",          color: "bg-indigo-50 text-indigo-700 border-indigo-200",    icon: TrendingUp },
+    submitted:          { label: "Submitted",         color: "bg-amber-50 text-amber-700 border-amber-200",       icon: Clock },
+    under_review:       { label: "Under Review",      color: "bg-blue-50 text-blue-700 border-blue-200",          icon: Eye },
+    revision_requested: { label: "Revision Required", color: "bg-orange-50 text-orange-700 border-orange-200",    icon: RotateCcw },
+    accepted:           { label: "Accepted",          color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: CheckCircle },
+    rejected:           { label: "Rejected",          color: "bg-rose-50 text-rose-700 border-rose-200",          icon: XCircle },
+    published:          { label: "Published",         color: "bg-indigo-50 text-indigo-700 border-indigo-200",    icon: TrendingUp },
   };
 
   const StatusBadge = ({ status }) => {
@@ -95,11 +100,11 @@ export default function AdminDashboard() {
   const stats = {
     total:       submissions.length,
     submitted:   submissions.filter(p => p.status === "submitted").length,
-    underReview: submissions.filter(p => p.status === "under-review").length,
+    underReview: submissions.filter(p => p.status === "under_review").length,
     accepted:    submissions.filter(p => p.status === "accepted").length,
     rejected:    submissions.filter(p => p.status === "rejected").length,
-    published:   submissions.filter(p => p.status === "published" || p.isPublished).length,
-    reviewsDone: assignments.filter(a => a.reviewSubmitted).length,
+    published:   submissions.filter(p => p.status === "published").length,
+    reviewsDone: assignments.filter(a => a.status === "completed").length,
   };
 
   if (loading) {
@@ -150,6 +155,14 @@ export default function AdminDashboard() {
 
       <div className="max-w-7xl mx-auto px-6 py-8">
 
+        {/* Error Banner */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <p className="font-semibold">Error loading data</p>
+            <p>{error}</p>
+          </div>
+        )}
+
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
           {[
@@ -174,10 +187,10 @@ export default function AdminDashboard() {
         {/* Quick Actions */}
         <div className="grid md:grid-cols-4 gap-4 mb-8">
           {[
-            { label: "Reviewer Applications", sub: "Approve or reject",    path: "/dashboard/admin/manage-reviewers", icon: UserCheck,   from: "from-teal-600",   to: "to-cyan-600",    textColor: "text-teal-100" },
-            { label: "Assign Reviewers",       sub: "Manage assignments",   path: "/dashboard/admin/assign-reviewers", icon: Users,       from: "from-green-600",  to: "to-emerald-600", textColor: "text-green-100" },
-            { label: "Editorial Decisions",    sub: "Make final decisions", path: "/dashboard/admin/review-decisions", icon: CheckCircle, from: "from-indigo-600", to: "to-blue-600",    textColor: "text-blue-100" },
-            { label: "Special Issues",         sub: "Manage special issues",path: "/dashboard/admin/special-issues",   icon: Sparkles,    from: "from-purple-600", to: "to-indigo-600",  textColor: "text-purple-100" },
+            { label: "Reviewer Applications", sub: "Approve or reject",     path: "/dashboard/admin/manage-reviewers", icon: UserCheck,   from: "from-teal-600",   to: "to-cyan-600",    textColor: "text-teal-100" },
+            { label: "Assign Reviewers",       sub: "Manage assignments",    path: "/dashboard/admin/assign-reviewers", icon: Users,       from: "from-green-600",  to: "to-emerald-600", textColor: "text-green-100" },
+            { label: "Editorial Decisions",    sub: "Make final decisions",  path: "/dashboard/admin/review-decisions", icon: CheckCircle, from: "from-indigo-600", to: "to-blue-600",    textColor: "text-blue-100" },
+            { label: "Special Issues",         sub: "Manage special issues", path: "/dashboard/admin/special-issues",   icon: Sparkles,    from: "from-purple-600", to: "to-indigo-600",  textColor: "text-purple-100" },
           ].map(({ label, sub, path, icon: Icon, from, to, textColor }) => (
             <button key={label} onClick={() => navigate(path)}
               className={`bg-gradient-to-br ${from} ${to} text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition text-left`}>
@@ -239,98 +252,114 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {filtered.map(p => (
-                    <tr key={p.id} className="hover:bg-slate-50 transition">
-                      <td className="px-6 py-4">
-                        <div className="flex items-start gap-3">
-                          <div className={`w-10 h-10 ${p.submissionType === "Special Issue" ? "bg-purple-100" : "bg-indigo-100"} rounded-lg flex items-center justify-center flex-shrink-0`}>
-                            {p.submissionType === "Special Issue" ? <Sparkles className="w-5 h-5 text-purple-600" /> : <FileText className="w-5 h-5 text-indigo-600" />}
+                  {filtered.map(p => {
+                    const authorName = `${p.users?.given_name || ""} ${p.users?.family_name || ""}`.trim() || "N/A";
+                    const authorEmail = p.users?.email || "";
+                    return (
+                      <tr key={p.id} className="hover:bg-slate-50 transition">
+                        <td className="px-6 py-4">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <FileText className="w-5 h-5 text-indigo-600" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-slate-900 text-sm leading-tight mb-1">{p.title}</h3>
+                              {p.manuscript_id && (
+                                <span className="text-xs text-slate-500 font-mono">{p.manuscript_id}</span>
+                              )}
+                            </div>
                           </div>
-                          <div>
-                            <h3 className="font-semibold text-slate-900 text-sm leading-tight mb-1">{p.title}</h3>
-                            {p.fileUrl && (
-                              <button onClick={e => { e.stopPropagation(); window.open(p.fileUrl, '_blank'); }}
-                                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1">
-                                <Download className="w-3 h-3" /> View File
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="font-medium text-slate-900 text-sm">{authorName}</p>
+                          <p className="text-xs text-slate-500">{authorEmail}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-medium rounded">
+                            {p.article_type || "Regular"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-medium rounded">
+                            {p.category || "Uncategorized"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <StatusBadge status={p.status} />
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => setSelectedPaper(p)}
+                              className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                              title="View details">
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            {p.file_url && (
+                              <a href={p.file_url} target="_blank" rel="noopener noreferrer"
+                                className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                                title="Download Paper">
+                                <Download className="w-4 h-4" />
+                              </a>
+                            )}
+                            {p.status === "accepted" && (
+                              <button onClick={() => publishPaper(p)}
+                                className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition flex items-center gap-1">
+                                <TrendingUp className="w-3 h-3" /> Publish
                               </button>
                             )}
+                            {p.status === "published" && (
+                              <span className="px-3 py-1.5 bg-indigo-50 text-indigo-600 text-xs font-semibold rounded-lg">
+                                Published ✓
+                              </span>
+                            )}
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="font-medium text-slate-900 text-sm">{p.authorName || 'N/A'}</p>
-                        <p className="text-xs text-slate-500">{p.authorEmail}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        {p.submissionType === "Special Issue"
-                          ? <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded"><Sparkles className="w-3 h-3" /> Special</span>
-                          : <span className="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-medium rounded">Regular</span>
-                        }
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-medium rounded">
-                          {p.category || 'Uncategorized'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <StatusBadge status={p.status} />
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => setSelectedPaper(p)}
-                            className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition">
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          {p.status === "accepted" && (
-                            <button onClick={() => publishPaper(p)}
-                              className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition flex items-center gap-1">
-                              <TrendingUp className="w-3 h-3" /> Publish
-                            </button>
-                          )}
-                          {p.status === "published" && (
-                            <span className="px-3 py-1.5 bg-indigo-50 text-indigo-600 text-xs font-semibold rounded-lg">
-                              Published ✓
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {filtered.map(p => (
-              <div key={p.id} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition p-6">
-                <div className="flex items-start gap-3 mb-4">
-                  <div className={`w-12 h-12 ${p.submissionType === "Special Issue" ? "bg-purple-100" : "bg-indigo-100"} rounded-lg flex items-center justify-center flex-shrink-0`}>
-                    {p.submissionType === "Special Issue" ? <Sparkles className="w-6 h-6 text-purple-600" /> : <FileText className="w-6 h-6 text-indigo-600" />}
+            {filtered.map(p => {
+              const authorName = `${p.users?.given_name || ""} ${p.users?.family_name || ""}`.trim() || "N/A";
+              return (
+                <div key={p.id} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition p-6">
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <FileText className="w-6 h-6 text-indigo-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-slate-900 mb-2 leading-tight">{p.title}</h3>
+                      <StatusBadge status={p.status} />
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900 mb-2 leading-tight">{p.title}</h3>
-                    <StatusBadge status={p.status} />
+                  <div className="text-sm mb-4 space-y-1">
+                    <div><span className="text-slate-500">Author: </span><span className="font-medium">{authorName}</span></div>
                   </div>
-                </div>
-                <div className="text-sm mb-4 space-y-1">
-                  <div><span className="text-slate-500">Author: </span><span className="font-medium">{p.authorName || p.authorEmail}</span></div>
-                  {p.doi && <div><span className="text-slate-500">DOI: </span><span className="font-mono text-xs text-indigo-600">{p.doi}</span></div>}
-                </div>
-                <div className="flex gap-2 pt-4 border-t border-slate-200">
-                  <button onClick={() => setSelectedPaper(p)}
-                    className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition">
-                    View Details
-                  </button>
-                  {p.status === "accepted" && (
-                    <button onClick={() => publishPaper(p)}
-                      className="flex-1 px-4 py-2 text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg transition">
-                      Publish
+                  <div className="flex gap-2 pt-4 border-t border-slate-200">
+                    <button onClick={() => setSelectedPaper(p)}
+                      className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition">
+                      View Details
                     </button>
-                  )}
+                    {p.file_url && (
+                      <a href={p.file_url} target="_blank" rel="noopener noreferrer"
+                        className="px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition flex items-center gap-1.5">
+                        <Download className="w-4 h-4" /> Paper
+                      </a>
+                    )}
+                    {p.status === "accepted" && (
+                      <button onClick={() => publishPaper(p)}
+                        className="flex-1 px-4 py-2 text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg transition">
+                        Publish
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -359,46 +388,84 @@ export default function AdminDashboard() {
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge status={selectedPaper.status} />
                   <span className="px-3 py-1 bg-slate-100 text-slate-700 text-xs font-medium rounded-full">
-                    {selectedPaper.category || 'Uncategorized'}
+                    {selectedPaper.category || "Uncategorized"}
                   </span>
                 </div>
               </div>
+
               <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg text-sm">
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-1">Author</p>
-                  <p className="font-medium">{selectedPaper.authorName || 'N/A'}</p>
-                  <p className="text-xs text-slate-500">{selectedPaper.authorEmail}</p>
+                  <p className="font-medium">
+                    {`${selectedPaper.users?.given_name || ""} ${selectedPaper.users?.family_name || ""}`.trim() || "N/A"}
+                  </p>
+                  <p className="text-xs text-slate-500">{selectedPaper.users?.email}</p>
                 </div>
-                {selectedPaper.doi && (
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500 mb-1">DOI</p>
-                    <p className="font-mono text-xs text-indigo-600">{selectedPaper.doi}</p>
-                  </div>
-                )}
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 mb-1">Submitted</p>
+                  <p className="font-medium">
+                    {selectedPaper.created_at ? new Date(selectedPaper.created_at).toLocaleDateString() : "N/A"}
+                  </p>
+                </div>
               </div>
+
               {selectedPaper.abstract && (
                 <div>
                   <h4 className="text-sm font-semibold text-slate-900 mb-2">Abstract</h4>
                   <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 rounded-lg p-3">{selectedPaper.abstract}</p>
                 </div>
               )}
-              {selectedPaper.fileUrl && (
-                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                      <FileText className="w-5 h-5 text-indigo-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Manuscript PDF</p>
-                      <p className="text-xs text-slate-500">Click to view</p>
-                    </div>
+
+              {selectedPaper.keywords && selectedPaper.keywords.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900 mb-2">Keywords</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {(Array.isArray(selectedPaper.keywords) ? selectedPaper.keywords : selectedPaper.keywords.split(",")).map((kw, i) => (
+                      <span key={i} className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs rounded-full">{kw.trim()}</span>
+                    ))}
                   </div>
-                  <button onClick={() => window.open(selectedPaper.fileUrl, '_blank')}
-                    className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition flex items-center gap-2">
-                    <Download className="w-4 h-4" /> Open
-                  </button>
                 </div>
               )}
+
+              {selectedPaper.paper_authors && selectedPaper.paper_authors.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900 mb-2">Authors</h4>
+                  <div className="space-y-2">
+                    {selectedPaper.paper_authors.map((author, i) => (
+                      <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg text-sm">
+                        <div>
+                          <p className="font-medium">
+                            {author.full_name}{" "}
+                            {author.is_corresponding && <span className="text-xs text-indigo-600">(Corresponding)</span>}
+                          </p>
+                          <p className="text-xs text-slate-500">{author.institution} · {author.email}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedPaper.file_url && (
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900 mb-2">Manuscript File</h4>
+                  <a
+                    href={selectedPaper.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition"
+                  >
+                    <Download className="w-4 h-4" /> Download Full Paper (PDF)
+                  </a>
+                </div>
+              )}
+
+              {!selectedPaper.file_url && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
+                  No manuscript file attached to this submission.
+                </div>
+              )}
+
               <div className="flex gap-3 pt-4 border-t border-slate-200">
                 {selectedPaper.status === "accepted" && (
                   <button onClick={() => publishPaper(selectedPaper)}

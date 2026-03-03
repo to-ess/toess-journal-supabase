@@ -1,17 +1,11 @@
 // src/pages/ProfileSettings.jsx
 import { useEffect, useState } from "react";
-import { auth } from "../../services/firebase";
-import {
-  updateProfile,
-  sendEmailVerification,
-  updatePassword,
-  EmailAuthProvider,
-  reauthenticateWithCredential
-} from "firebase/auth";
+import { supabase } from "../../services/supabase";
+
 import { User, Mail, CheckCircle, AlertCircle, Shield, Calendar, Lock, Eye, EyeOff } from "lucide-react";
 
 export default function ProfileSettings() {
-  const user = auth.currentUser;
+  const user = supabase.auth.getUser();
 
   const [displayName, setDisplayName] = useState("");
   const [emailVerified, setEmailVerified] = useState(false);

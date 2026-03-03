@@ -5,15 +5,14 @@ import {
   Eye, Download, Award, Calendar, AlertCircle, Plus, Search,
   Users, RotateCcw, TrendingUp
 } from "lucide-react";
-import { auth } from "../../services/firebase";
+import { supabase } from "../../services/supabase";
 import { getMySubmissions } from "../../services/submissionService";
 import { getReviewerRequestStatus } from "../../services/reviewerService";
 
-// ✅ Single source of truth for all statuses
 const STATUS_CONFIG = {
   submitted:           { label: "Submitted",         color: "bg-amber-50 text-amber-700 border-amber-200",       icon: Clock,       desc: "Your paper is awaiting reviewer assignment." },
-  "under-review":      { label: "Under Review",      color: "bg-blue-50 text-blue-700 border-blue-200",          icon: Eye,         desc: "Your paper is currently being reviewed by experts." },
-  "revision-required": { label: "Revision Required", color: "bg-orange-50 text-orange-700 border-orange-200",    icon: RotateCcw,   desc: "Reviewers have requested revisions. Check editorial comments below." },
+  under_review:        { label: "Under Review",      color: "bg-blue-50 text-blue-700 border-blue-200",          icon: Eye,         desc: "Your paper is currently being reviewed by experts." },
+  revision_requested:  { label: "Revision Required", color: "bg-orange-50 text-orange-700 border-orange-200",    icon: RotateCcw,   desc: "Reviewers have requested revisions. Check editorial comments below." },
   accepted:            { label: "Accepted",          color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: CheckCircle, desc: "Congratulations! Your paper has been accepted for publication." },
   rejected:            { label: "Rejected",          color: "bg-rose-50 text-rose-700 border-rose-200",          icon: XCircle,     desc: "Your paper was not accepted at this time." },
   published:           { label: "Published",         color: "bg-indigo-50 text-indigo-700 border-indigo-200",    icon: TrendingUp,  desc: "Your paper is published and publicly accessible." },
@@ -30,7 +29,6 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-// ✅ Safe date formatter — handles Date objects, Firestore Timestamps, and null
 const formatDate = (date, options = { month: 'short', day: 'numeric', year: 'numeric' }) => {
   if (!date) return "N/A";
   if (date instanceof Date) return date.toLocaleDateString('en-US', options);
@@ -49,12 +47,13 @@ export default function AuthorDashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const user = auth.currentUser;
+      // ✅ Fixed: await getUser() and use user.id (not user.uid)
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) { navigate('/login'); return; }
       try {
         const [data, reviewerRequest] = await Promise.all([
-          getMySubmissions(user.uid),
-          getReviewerRequestStatus(user.uid)
+          getMySubmissions(user.id),
+          getReviewerRequestStatus(user.id)
         ]);
         setSubmissions(data);
         if (reviewerRequest) setReviewerStatus(reviewerRequest.status);
@@ -67,12 +66,11 @@ export default function AuthorDashboard() {
     fetchData();
   }, [navigate]);
 
-  // ✅ Fixed stats — correct status strings
   const stats = {
     total:     submissions.length,
-    inReview:  submissions.filter(p => ["submitted", "under-review"].includes(p.status)).length,
-    accepted:  submissions.filter(p => p.status === "accepted").length,  // was "approved" ❌
-    published: submissions.filter(p => p.status === "published" || p.isPublished).length,
+    inReview:  submissions.filter(p => ["submitted", "under_review"].includes(p.status)).length,
+    accepted:  submissions.filter(p => p.status === "accepted").length,
+    published: submissions.filter(p => p.status === "published").length,
   };
 
   const ReviewerBanner = () => {
@@ -153,7 +151,6 @@ export default function AuthorDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-
         <ReviewerBanner />
 
         {/* Stats */}
@@ -277,33 +274,27 @@ export default function AuthorDashboard() {
                       </div>
                     </div>
 
-                    {/* ✅ Status description */}
                     {STATUS_CONFIG[paper.status] && (
                       <p className="text-xs text-slate-500 italic mb-3">{STATUS_CONFIG[paper.status].desc}</p>
                     )}
 
-                    {/* ✅ Show editorial comments if present */}
-                    {paper.editorialComments && (
+                    {paper.editorial_comments && (
                       <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                         <p className="text-xs font-semibold text-amber-800 mb-1">Editorial Comments:</p>
-                        <p className="text-xs text-amber-900">{paper.editorialComments}</p>
+                        <p className="text-xs text-amber-900">{paper.editorial_comments}</p>
                       </div>
                     )}
 
                     <div className="space-y-1.5 mb-4 text-sm text-slate-600">
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
-                        {/* ✅ Safe date — no more .seconds crash */}
-                        <span>Submitted: {formatDate(paper.createdAt)}</span>
+                        <span>Submitted: {formatDate(paper.created_at)}</span>
                       </div>
                       {paper.category && (
                         <div className="flex items-center gap-2">
                           <span>Category:</span>
                           <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded">{paper.category}</span>
                         </div>
-                      )}
-                      {paper.doi && (
-                        <p className="text-xs font-mono text-indigo-600">DOI: {paper.doi}</p>
                       )}
                     </div>
 
@@ -312,8 +303,8 @@ export default function AuthorDashboard() {
                         className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition flex items-center justify-center gap-2">
                         <Eye className="w-4 h-4" /> View Details
                       </button>
-                      {paper.fileUrl && (
-                        <button onClick={() => window.open(paper.fileUrl, '_blank')}
+                      {paper.file_url && (
+                        <button onClick={() => window.open(paper.file_url, '_blank')}
                           className="flex-1 px-4 py-2 text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg transition flex items-center justify-center gap-2">
                           <Download className="w-4 h-4" /> Download
                         </button>
@@ -332,8 +323,7 @@ export default function AuthorDashboard() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-slate-900 mb-1 truncate">{paper.title}</h3>
-                        {/* ✅ Safe date */}
-                        <p className="text-xs text-slate-500">Submitted on {formatDate(paper.createdAt)}</p>
+                        <p className="text-xs text-slate-500">Submitted on {formatDate(paper.created_at)}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -369,30 +359,22 @@ export default function AuthorDashboard() {
                 )}
               </div>
 
-              {/* ✅ Editorial comments prominently shown */}
-              {selectedPaper.editorialComments && (
+              {selectedPaper.editorial_comments && (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
                   <p className="text-sm font-semibold text-amber-900 mb-2">📋 Editorial Decision & Comments</p>
-                  <p className="text-sm text-amber-800 leading-relaxed">{selectedPaper.editorialComments}</p>
+                  <p className="text-sm text-amber-800 leading-relaxed">{selectedPaper.editorial_comments}</p>
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg text-sm">
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-1">Submission Date</p>
-                  {/* ✅ Safe date */}
-                  <p className="font-medium">{formatDate(selectedPaper.createdAt, { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                  <p className="font-medium">{formatDate(selectedPaper.created_at, { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                 </div>
-                {selectedPaper.doi && (
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500 mb-1">DOI</p>
-                    <p className="font-mono text-xs text-indigo-600">{selectedPaper.doi}</p>
-                  </div>
-                )}
-                {selectedPaper.publishedDate && (
+                {selectedPaper.published_date && (
                   <div>
                     <p className="text-xs font-semibold text-slate-500 mb-1">Published Date</p>
-                    <p className="font-medium">{formatDate(selectedPaper.publishedDate, { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                    <p className="font-medium">{formatDate(selectedPaper.published_date, { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                   </div>
                 )}
               </div>
@@ -416,8 +398,8 @@ export default function AuthorDashboard() {
               )}
 
               <div className="flex gap-3 pt-4 border-t border-slate-200">
-                {selectedPaper.fileUrl && (
-                  <button onClick={() => window.open(selectedPaper.fileUrl, '_blank')}
+                {selectedPaper.file_url && (
+                  <button onClick={() => window.open(selectedPaper.file_url, '_blank')}
                     className="flex-1 px-4 py-2.5 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2">
                     <Download className="w-4 h-4" /> Download Manuscript
                   </button>

@@ -1,194 +1,140 @@
-import { db } from "./firebase";
-import {
-  collection,
-  addDoc,
-  getDocs,
-  getDoc,
-  doc,
-  query,
-  orderBy,
-  updateDoc,
-  deleteDoc,
-  Timestamp,
-  increment,
-} from "firebase/firestore";
-
-/* ================= COLLECTION REF ================= */
-const specialIssuesRef = collection(db, "specialIssues");
-
+import { supabase } from "./supabase";
 
 /* ==================================================
    CREATE SPECIAL ISSUE (Admin)
 ================================================== */
 export async function createSpecialIssue(data) {
   try {
-    const docRef = await addDoc(specialIssuesRef, {
-      ...data,
-      status: "active",
-      submissionCount: 0,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    });
+    const { data: issue, error } = await supabase
+      .from("special_issues")
+      .insert({
+        ...data,
+        status: "active",
+        submission_count: 0
+      })
+      .select()
+      .single();
 
-    return {
-      id: docRef.id,
-      ...data,
-      status: "active",
-      submissionCount: 0,
-    };
-
+    if (error) throw error;
+    return issue;
   } catch (error) {
     console.error("Error creating special issue:", error);
     throw error;
   }
 }
 
-
 /* ==================================================
    GET ACTIVE SPECIAL ISSUES (Author dropdown)
-   SAFE VERSION — no Firestore index required
 ================================================== */
 export async function getActiveSpecialIssues() {
   try {
+    const { data, error } = await supabase
+      .from("special_issues")
+      .select("*")
+      .eq("status", "active")
+      .order("deadline", { ascending: true });
 
-    const snapshot = await getDocs(specialIssuesRef);
-
-    const activeIssues = snapshot.docs
-      .map(docSnap => ({
-        id: docSnap.id,
-        ...docSnap.data(),
-        deadline: docSnap.data().deadline?.toDate?.() || null,
-        createdAt: docSnap.data().createdAt?.toDate?.() || null,
-        updatedAt: docSnap.data().updatedAt?.toDate?.() || null,
-      }))
-      .filter(issue => issue.status === "active")
-      .sort((a, b) => {
-        if (!a.deadline) return 1;
-        if (!b.deadline) return -1;
-        return a.deadline - b.deadline;
-      });
-
-    console.log("Active special issues:", activeIssues);
-
-    return activeIssues;
-
+    if (error) throw error;
+    return data || [];
   } catch (error) {
     console.error("Error getting active special issues:", error);
     return [];
   }
 }
 
-
 /* ==================================================
    GET ALL SPECIAL ISSUES (Admin)
 ================================================== */
 export async function getAllSpecialIssues() {
   try {
+    const { data, error } = await supabase
+      .from("special_issues")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-    const q = query(
-      specialIssuesRef,
-      orderBy("createdAt", "desc")
-    );
-
-    const snapshot = await getDocs(q);
-
-    return snapshot.docs.map(docSnap => ({
-      id: docSnap.id,
-      ...docSnap.data(),
-      deadline: docSnap.data().deadline?.toDate?.() || null,
-      createdAt: docSnap.data().createdAt?.toDate?.() || null,
-      updatedAt: docSnap.data().updatedAt?.toDate?.() || null,
-    }));
-
+    if (error) throw error;
+    return data || [];
   } catch (error) {
     console.error("Error getting all special issues:", error);
     throw error;
   }
 }
 
-
 /* ==================================================
    GET SINGLE SPECIAL ISSUE
 ================================================== */
 export async function getSpecialIssue(id) {
   try {
+    const { data, error } = await supabase
+      .from("special_issues")
+      .select("*")
+      .eq("id", id)
+      .single();
 
-    const docRef = doc(db, "specialIssues", id);
-    const docSnap = await getDoc(docRef);
-
-    if (!docSnap.exists()) {
-      throw new Error("Special issue not found");
-    }
-
-    return {
-      id: docSnap.id,
-      ...docSnap.data(),
-      deadline: docSnap.data().deadline?.toDate?.() || null,
-      createdAt: docSnap.data().createdAt?.toDate?.() || null,
-      updatedAt: docSnap.data().updatedAt?.toDate?.() || null,
-    };
-
+    if (error) throw new Error("Special issue not found");
+    return data;
   } catch (error) {
     console.error("Error getting special issue:", error);
     throw error;
   }
 }
 
-
 /* ==================================================
    UPDATE SPECIAL ISSUE
 ================================================== */
 export async function updateSpecialIssue(id, data) {
   try {
+    const { error } = await supabase
+      .from("special_issues")
+      .update({ ...data, updated_at: new Date().toISOString() })
+      .eq("id", id);
 
-    const docRef = doc(db, "specialIssues", id);
-
-    await updateDoc(docRef, {
-      ...data,
-      updatedAt: Timestamp.now(),
-    });
-
+    if (error) throw error;
     return true;
-
   } catch (error) {
     console.error("Error updating special issue:", error);
     throw error;
   }
 }
 
-
 /* ==================================================
    DELETE SPECIAL ISSUE
 ================================================== */
 export async function deleteSpecialIssue(id) {
   try {
+    const { error } = await supabase
+      .from("special_issues")
+      .delete()
+      .eq("id", id);
 
-    const docRef = doc(db, "specialIssues", id);
-
-    await deleteDoc(docRef);
-
+    if (error) throw error;
     return true;
-
   } catch (error) {
     console.error("Error deleting special issue:", error);
     throw error;
   }
 }
 
-
 /* ==================================================
    INCREMENT SUBMISSION COUNT
 ================================================== */
 export async function incrementSpecialIssueCount(id) {
   try {
+    const { data: issue } = await supabase
+      .from("special_issues")
+      .select("submission_count")
+      .eq("id", id)
+      .single();
 
-    const docRef = doc(db, "specialIssues", id);
+    if (!issue) return;
 
-    await updateDoc(docRef, {
-      submissionCount: increment(1),
-      updatedAt: Timestamp.now(),
-    });
-
+    await supabase
+      .from("special_issues")
+      .update({
+        submission_count: (issue.submission_count || 0) + 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", id);
   } catch (error) {
     console.error("Error incrementing submission count:", error);
   }

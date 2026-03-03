@@ -2,11 +2,9 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { registerUser, signInWithGoogle } from "../services/authService";
 import { saveUserProfile } from "../services/userService";
-import { getUserRole } from "../services/userService";
-import { auth } from "../services/firebase";
+import { supabase } from "../services/supabase";
 import { User, Mail, Lock, Eye, EyeOff, CheckCircle, AlertCircle, UserPlus } from "lucide-react";
 
-// Google "G" SVG logo
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
     <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -60,32 +58,32 @@ export default function Register() {
     setError("");
     setMessage("");
     try {
-      await registerUser(email, password);
-      await saveUserProfile(auth.currentUser, { givenName, familyName, role: "author" });
+      const user = await registerUser(email, password);
+      await saveUserProfile(user, { givenName, familyName, role: "author" });
       setMessage("Account created! Please check your email to verify your account before logging in.");
       setTimeout(() => navigate("/login"), 3000);
     } catch (err) {
-      if (err.code === "auth/email-already-in-use") setError("An account with this email already exists");
-      else if (err.code === "auth/weak-password") setError("Password is too weak");
+      if (err.message?.includes("already registered")) setError("An account with this email already exists");
+      else if (err.message?.includes("weak")) setError("Password is too weak");
       else setError(err.message || "Registration failed");
     } finally {
       setLoading(false);
     }
   };
 
+  // Google sign-up: just trigger the redirect — AuthCallback handles the rest
   const handleGoogleRegister = async () => {
-    if (!agreeTerms) { setError("You must agree to the terms of use before continuing"); return; }
+    if (!agreeTerms) {
+      setError("You must agree to the terms of use before continuing");
+      return;
+    }
     setGoogleLoading(true);
     setError("");
     try {
-      const user = await signInWithGoogle();
-      await saveUserProfile(user);
-      const role = await getUserRole(user.uid);
-      navigate(role === "admin" ? "/dashboard/admin" : "/dashboard/author");
+      await signInWithGoogle();
+      // Browser redirects to Google — execution stops here
     } catch (err) {
-      if (err.code === "auth/popup-closed-by-user") setError("Sign-up cancelled");
-      else setError("Google sign-up failed. Please try again.");
-    } finally {
+      setError("Google sign-up failed. Please try again.");
       setGoogleLoading(false);
     }
   };
@@ -141,14 +139,13 @@ export default function Register() {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
               ) : <GoogleIcon />}
-              {googleLoading ? "Signing up..." : "Sign up with Google"}
+              {googleLoading ? "Redirecting to Google..." : "Sign up with Google"}
             </button>
 
-            {/* Terms note for Google */}
             <p className="text-xs text-slate-500 text-center -mt-3">
               By signing up with Google you agree to our{" "}
-              <Link to="/terms" className="text-indigo-600 hover:underline">terms</Link> &{" "}
-              <Link to="/privacy" className="text-indigo-600 hover:underline">privacy policy</Link>
+              <Link to="/terms-of-service" className="text-indigo-600 hover:underline">terms</Link> &{" "}
+              <Link to="/privacy-policy" className="text-indigo-600 hover:underline">privacy policy</Link>
             </p>
 
             {/* Divider */}
@@ -237,9 +234,9 @@ export default function Register() {
                   className="mt-1 w-4 h-4 text-indigo-600 focus:ring-indigo-500 rounded" required />
                 <p className="text-sm text-slate-700">
                   I agree to the{" "}
-                  <Link to="/terms" className="text-indigo-600 hover:underline font-semibold">terms of use</Link>
+                  <Link to="/terms-of-service" className="text-indigo-600 hover:underline font-semibold">terms of use</Link>
                   {" "}and{" "}
-                  <Link to="/privacy" className="text-indigo-600 hover:underline font-semibold">privacy policy</Link>
+                  <Link to="/privacy-policy" className="text-indigo-600 hover:underline font-semibold">privacy policy</Link>
                 </p>
               </div>
 

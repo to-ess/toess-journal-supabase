@@ -1,6 +1,6 @@
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { auth } from "../services/firebase";
+import { observeAuth, logoutUser } from "../services/authService";
+import { supabase } from "../services/supabase";
 import { useEffect, useState, useRef } from "react";
 import {
   Menu, X, ChevronDown, LogOut, LayoutDashboard,
@@ -23,7 +23,7 @@ export default function Navbar() {
   const dashPath = isAdmin ? "/dashboard/admin" : "/dashboard/author";
   const DashIcon = isAdmin ? Shield : LayoutDashboard;
 
-  useEffect(() => { const u = onAuthStateChanged(auth, setUser); return u; }, []);
+  useEffect(() => { const u = observeAuth(setUser); return u; }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -45,7 +45,7 @@ export default function Navbar() {
     setDropdownOpen(false);
   }, [location.pathname]);
 
-  const handleLogout = async () => { await signOut(auth); navigate("/"); };
+  const handleLogout = async () => { await logoutUser(); navigate("/"); };
 
   const links = [
     { to: "/", label: "Home" },

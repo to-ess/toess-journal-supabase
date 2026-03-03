@@ -1,39 +1,17 @@
-import {
-  collection,
-  doc,
-  setDoc,
-  getDoc,
-  getDocs,
-  updateDoc,
-  query,
-  where,
-  Timestamp,
-} from "firebase/firestore";
-import { db } from "./firebase";
-import {
-  sendReviewerAssignedEmail,
-  sendEditorialDecisionEmail,
-} from "./emailService";
+import { supabase } from "./supabase";
+import { sendReviewerAssignedEmail, sendEditorialDecisionEmail } from "./emailService";
 
 /* ================= REVIEWER REGISTRATION ================= */
 export const registerAsReviewer = async (userId, formData) => {
   try {
-    const reviewerRef = doc(db, "reviewerRequests", userId);
-    await setDoc(reviewerRef, {
-      userId,
-      fullName: formData.fullName,
-      email: formData.email,
-      institution: formData.institution,
+    const { error } = await supabase.from("reviewer_requests").insert({
+      user_id: userId,
       designation: formData.designation,
-      expertise: formData.expertise,
+      institution: formData.institution,
       qualifications: formData.qualifications,
-      experience: formData.experience,
-      linkedIn: formData.linkedIn || "",
-      orcid: formData.orcid || "",
-      status: "pending",
-      submittedAt: Timestamp.now(),
-      createdAt: Timestamp.now()
+      status: "pending"
     });
+    if (error) throw error;
     return { success: true };
   } catch (error) {
     console.error("Error registering reviewer:", error);
@@ -44,21 +22,28 @@ export const registerAsReviewer = async (userId, formData) => {
 /* ================= GET REVIEWER REQUEST STATUS ================= */
 export const getReviewerRequestStatus = async (userId) => {
   try {
-    const ref = doc(db, "reviewerRequests", userId);
-    const snap = await getDoc(ref);
-    if (snap.exists()) return { id: snap.id, ...snap.data() };
-    return null;
+    const { data, error } = await supabase
+      .from("reviewer_requests")
+      .select("*")
+      .eq("user_id", userId)
+      .single();
+    if (error) return null;
+    return data;
   } catch (error) {
     console.error("Error getting reviewer request:", error);
-    throw error;
+    return null;
   }
 };
 
 /* ================= GET ALL REVIEWER REQUESTS (Admin) ================= */
 export const getAllReviewerRequests = async () => {
   try {
-    const snapshot = await getDocs(collection(db, "reviewerRequests"));
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    const { data, error } = await supabase
+      .from("reviewer_requests")
+      .select(`*, users (email, given_name, family_name)`)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return data || [];
   } catch (error) {
     console.error("Error getting reviewer requests:", error);
     throw error;
@@ -66,17 +51,19 @@ export const getAllReviewerRequests = async () => {
 };
 
 /* ================= APPROVE REVIEWER (Admin) ================= */
-export const approveReviewer = async (userId) => {
+export const approveReviewer = async (requestId, userId) => {
   try {
-    await updateDoc(doc(db, "reviewerRequests", userId), {
-      status: "approved",
-      approvedAt: Timestamp.now()
-    });
+    const { error: requestError } = await supabase
+      .from("reviewer_requests")
+      .update({ status: "approved" })
+      .eq("id", requestId);
+    if (requestError) throw requestError;
 
-    await setDoc(doc(db, "users", userId), {
-      role: "reviewer",
-      updatedAt: Timestamp.now()
-    }, { merge: true });
+    const { error: userError } = await supabase
+      .from("users")
+      .update({ role: "reviewer", updated_at: new Date().toISOString() })
+      .eq("id", userId);
+    if (userError) throw userError;
 
     return { success: true };
   } catch (error) {
@@ -86,13 +73,13 @@ export const approveReviewer = async (userId) => {
 };
 
 /* ================= REJECT REVIEWER (Admin) ================= */
-export const rejectReviewer = async (userId, reason = "") => {
+export const rejectReviewer = async (requestId, reason = "") => {
   try {
-    await updateDoc(doc(db, "reviewerRequests", userId), {
-      status: "rejected",
-      rejectionReason: reason,
-      rejectedAt: Timestamp.now()
-    });
+    const { error } = await supabase
+      .from("reviewer_requests")
+      .update({ status: "rejected" })
+      .eq("id", requestId);
+    if (error) throw error;
     return { success: true };
   } catch (error) {
     console.error("Error rejecting reviewer:", error);
@@ -103,12 +90,12 @@ export const rejectReviewer = async (userId, reason = "") => {
 /* ================= GET APPROVED REVIEWERS ================= */
 export const getRegisteredReviewers = async () => {
   try {
-    const q = query(
-      collection(db, "reviewerRequests"),
-      where("status", "==", "approved")
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    const { data, error } = await supabase
+      .from("reviewer_requests")
+      .select(`*, users (id, email, given_name, family_name)`)
+      .eq("status", "approved");
+    if (error) throw error;
+    return data || [];
   } catch (error) {
     console.error("Error getting approved reviewers:", error);
     throw error;
@@ -118,45 +105,47 @@ export const getRegisteredReviewers = async () => {
 /* ================= ASSIGN PAPER TO REVIEWER (Admin) ================= */
 export const assignPaperToReviewer = async (paperId, reviewerEmail, reviewerName, deadline) => {
   try {
-    const assignmentRef = doc(collection(db, "reviewAssignments"));
-    await setDoc(assignmentRef, {
-      paperId,
+    const { data: reviewer, error: reviewerError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", reviewerEmail)
+      .single();
+    if (reviewerError || !reviewer) throw new Error("Reviewer not found");
+
+    const { data: assignment, error: assignError } = await supabase
+      .from("reviewer_assignments")
+      .insert({
+        paper_id: paperId,
+        reviewer_id: reviewer.id,
+        assigned_at: new Date().toISOString(),
+        deadline: new Date(deadline).toISOString(),
+        status: "pending"
+      })
+      .select()
+      .single();
+    if (assignError) throw assignError;
+
+    const { error: paperError } = await supabase
+      .from("papers")
+      .update({ status: "under_review", updated_at: new Date().toISOString() })
+      .eq("id", paperId);
+    if (paperError) throw paperError;
+
+    const { data: paper } = await supabase
+      .from("papers")
+      .select("title")
+      .eq("id", paperId)
+      .single();
+
+    await sendReviewerAssignedEmail({
       reviewerEmail,
       reviewerName,
-      assignedAt: Timestamp.now(),
-      deadline: Timestamp.fromDate(new Date(deadline)),
-      status: "pending",
-      reviewSubmitted: false,
-      createdAt: Timestamp.now()
+      paperTitle: paper?.title || "Untitled",
+      paperId,
+      deadline
     });
 
-    // Update the paper status to under-review
-    const paperRef = doc(db, "submissions", paperId);
-    const paperDoc = await getDoc(paperRef);
-    if (paperDoc.exists()) {
-      const currentReviewers = paperDoc.data().assignedReviewers || [];
-      await updateDoc(paperRef, {
-        assignedReviewers: [...currentReviewers, {
-          email: reviewerEmail,
-          name: reviewerName,
-          assignedAt: Timestamp.now(),
-          assignmentId: assignmentRef.id
-        }],
-        reviewStatus: "under-review",
-        status: "under-review"
-      });
-
-      // ✅ Send email to reviewer
-      await sendReviewerAssignedEmail({
-        reviewerEmail,
-        reviewerName,
-        paperTitle: paperDoc.data().title,
-        paperId,
-        deadline, // ISO string — emailService handles formatting
-      });
-    }
-
-    return { success: true, assignmentId: assignmentRef.id };
+    return { success: true, assignmentId: assignment.id };
   } catch (error) {
     console.error("Error assigning paper:", error);
     throw error;
@@ -166,23 +155,61 @@ export const assignPaperToReviewer = async (paperId, reviewerEmail, reviewerName
 /* ================= GET ALL ASSIGNMENTS (Admin) ================= */
 export const getAllAssignments = async () => {
   try {
-    const snapshot = await getDocs(collection(db, "reviewAssignments"));
-    const assignments = [];
-    for (const assignmentDoc of snapshot.docs) {
-      const data = assignmentDoc.data();
-      try {
-        const paperRef = doc(db, "submissions", data.paperId);
-        const paperDoc = await getDoc(paperRef);
-        assignments.push({
-          id: assignmentDoc.id,
-          ...data,
-          paper: paperDoc.exists() ? { id: paperDoc.id, ...paperDoc.data() } : null
-        });
-      } catch {
-        assignments.push({ id: assignmentDoc.id, ...data, paper: null });
+    const { data: assignments, error } = await supabase
+      .from("reviewer_assignments")
+      .select("*")
+      .order("assigned_at", { ascending: false });
+    
+    if (error) {
+      console.error("Error fetching assignments:", error);
+      throw error;
+    }
+    
+    if (!assignments || assignments.length === 0) return [];
+
+    const reviewerIds = [...new Set(assignments.map(a => a.reviewer_id).filter(Boolean))];
+    let reviewersData = [];
+    
+    if (reviewerIds.length > 0) {
+      const { data: users, error: usersError } = await supabase
+        .from("users")
+        .select("id, email, given_name, family_name")
+        .in("id", reviewerIds);
+      
+      if (usersError) {
+        console.error("Error fetching reviewers:", usersError);
+      } else {
+        reviewersData = users || [];
       }
     }
-    return assignments;
+
+    const reviewersMap = {};
+    reviewersData.forEach(u => { reviewersMap[u.id] = u; });
+
+    const paperIds = [...new Set(assignments.map(a => a.paper_id).filter(Boolean))];
+    let papersData = [];
+    
+    if (paperIds.length > 0) {
+      const { data: papers, error: papersError } = await supabase
+        .from("papers")
+        .select("id, title, status")
+        .in("id", paperIds);
+      
+      if (papersError) {
+        console.error("Error fetching papers:", papersError);
+      } else {
+        papersData = papers || [];
+      }
+    }
+
+    const papersMap = {};
+    papersData.forEach(p => { papersMap[p.id] = p; });
+
+    return assignments.map(a => ({
+      ...a,
+      users: reviewersMap[a.reviewer_id] || null,
+      papers: papersMap[a.paper_id] || null
+    }));
   } catch (error) {
     console.error("Error getting all assignments:", error);
     throw error;
@@ -190,29 +217,82 @@ export const getAllAssignments = async () => {
 };
 
 /* ================= GET ASSIGNMENTS FOR REVIEWER ================= */
-export const getReviewerAssignments = async (reviewerEmail) => {
+export const getReviewerAssignments = async (email) => {
   try {
-    const q = query(
-      collection(db, "reviewAssignments"),
-      where("reviewerEmail", "==", reviewerEmail)
-    );
-    const snapshot = await getDocs(q);
-    const assignments = [];
-    for (const assignmentDoc of snapshot.docs) {
-      const data = assignmentDoc.data();
-      try {
-        const paperRef = doc(db, "submissions", data.paperId);
-        const paperDoc = await getDoc(paperRef);
-        assignments.push({
-          id: assignmentDoc.id,
-          ...data,
-          paper: paperDoc.exists() ? { id: paperDoc.id, ...paperDoc.data() } : null
-        });
-      } catch {
-        assignments.push({ id: assignmentDoc.id, ...data, paper: null });
-      }
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .single();
+    if (userError || !userData) throw new Error("User not found for email: " + email);
+
+    const { data: assignments, error: assignError } = await supabase
+      .from("reviewer_assignments")
+      .select("*")
+      .eq("reviewer_id", userData.id)
+      .order("assigned_at", { ascending: false });
+
+    if (assignError) throw assignError;
+    if (!assignments || assignments.length === 0) return [];
+
+    const paperIds = [...new Set(assignments.map(a => a.paper_id).filter(Boolean))];
+
+    const { data: papersData, error: papersError } = await supabase
+      .from("papers")
+      .select("id, title, abstract, article_type, category, keywords, status, file_url")
+      .in("id", paperIds);
+
+    if (papersError) {
+      console.error("Error fetching papers:", papersError);
     }
-    return assignments;
+
+    const papersMap = {};
+    (papersData || []).forEach(p => { papersMap[p.id] = p; });
+
+    const { data: authorsData, error: authorsError } = await supabase
+      .from("paper_authors")
+      .select("paper_id, full_name, email, institution, is_corresponding")
+      .in("paper_id", paperIds);
+
+    if (authorsError) {
+      console.error("Error fetching authors:", authorsError);
+    }
+
+    const authorsMap = {};
+    (authorsData || []).forEach(a => {
+      if (!authorsMap[a.paper_id]) authorsMap[a.paper_id] = [];
+      authorsMap[a.paper_id].push(a);
+    });
+
+    return assignments.map(a => {
+      const p = papersMap[a.paper_id];
+      const authors = authorsMap[a.paper_id] || [];
+      const correspondingAuthor =
+        authors.find(au => au.is_corresponding) || authors[0];
+
+      return {
+        ...a,
+        reviewSubmitted: a.status === "completed",
+        paper: p
+          ? {
+              id: p.id,
+              title: p.title,
+              abstract: p.abstract,
+              article_type: p.article_type,
+              category: p.category,
+              keywords: Array.isArray(p.keywords)
+                ? p.keywords
+                : p.keywords
+                ? p.keywords.split(",").map(k => k.trim()).filter(Boolean)
+                : [],
+              fileUrl: p.file_url || null,
+              authorName: correspondingAuthor?.full_name || "",
+              authorEmail: correspondingAuthor?.email || "",
+              authorInstitution: correspondingAuthor?.institution || "",
+            }
+          : null,
+      };
+    });
   } catch (error) {
     console.error("Error getting reviewer assignments:", error);
     throw error;
@@ -222,47 +302,40 @@ export const getReviewerAssignments = async (reviewerEmail) => {
 /* ================= SUBMIT REVIEW (Reviewer) ================= */
 export const submitReview = async (assignmentId, reviewData) => {
   try {
-    const reviewRef = doc(collection(db, "reviews"));
-    await setDoc(reviewRef, {
-      assignmentId,
-      paperId: reviewData.paperId,
-      reviewerEmail: reviewData.reviewerEmail,
-      reviewerName: reviewData.reviewerName,
-      originalityRating: reviewData.originalityRating,
-      methodologyRating: reviewData.methodologyRating,
-      clarityRating: reviewData.clarityRating,
-      significanceRating: reviewData.significanceRating,
-      overallRating: reviewData.overallRating,
-      strengths: reviewData.strengths,
-      weaknesses: reviewData.weaknesses,
-      detailedComments: reviewData.detailedComments,
-      confidentialComments: reviewData.confidentialComments || "",
-      recommendation: reviewData.recommendation,
-      submittedAt: Timestamp.now(),
-      createdAt: Timestamp.now()
-    });
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", reviewData.reviewerEmail)
+      .single();
+    if (userError || !userData) throw new Error("Reviewer user not found");
 
-    // Mark assignment as completed
-    await updateDoc(doc(db, "reviewAssignments", assignmentId), {
-      status: "completed",
-      reviewSubmitted: true,
-      reviewId: reviewRef.id,
-      completedAt: Timestamp.now()
-    });
+    const { data: review, error: reviewError } = await supabase
+      .from("reviews")
+      .insert({
+        paper_id: reviewData.paperId,
+        reviewer_id: userData.id,
+        originality_rating: reviewData.originalityRating,
+        methodology_rating: reviewData.methodologyRating,
+        clarity_rating: reviewData.clarityRating,
+        overall_rating: reviewData.overallRating,
+        recommendation: reviewData.recommendation,
+        strengths: reviewData.strengths,
+        weaknesses: reviewData.weaknesses,
+        detailed_comments: reviewData.detailedComments,
+        confidential_comments: reviewData.confidentialComments || "",
+        submitted_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    if (reviewError) throw reviewError;
 
-    // Update paper review count
-    const paperRef = doc(db, "submissions", reviewData.paperId);
-    const paperDoc = await getDoc(paperRef);
-    if (paperDoc.exists()) {
-      const currentReviews = paperDoc.data().reviews || [];
-      await updateDoc(paperRef, {
-        reviews: [...currentReviews, reviewRef.id],
-        reviewCount: (paperDoc.data().reviewCount || 0) + 1,
-        lastReviewedAt: Timestamp.now()
-      });
-    }
+    const { error: assignError } = await supabase
+      .from("reviewer_assignments")
+      .update({ status: "completed" })
+      .eq("id", assignmentId);
+    if (assignError) throw assignError;
 
-    return { success: true, reviewId: reviewRef.id };
+    return { success: true, reviewId: review.id };
   } catch (error) {
     console.error("Error submitting review:", error);
     throw error;
@@ -272,9 +345,12 @@ export const submitReview = async (assignmentId, reviewData) => {
 /* ================= GET REVIEWS FOR PAPER (Admin) ================= */
 export const getReviewsForPaper = async (paperId) => {
   try {
-    const q = query(collection(db, "reviews"), where("paperId", "==", paperId));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    const { data, error } = await supabase
+      .from("reviews")
+      .select(`*, users (email, given_name, family_name)`)
+      .eq("paper_id", paperId);
+    if (error) throw error;
+    return data || [];
   } catch (error) {
     console.error("Error getting reviews for paper:", error);
     throw error;
@@ -284,24 +360,125 @@ export const getReviewsForPaper = async (paperId) => {
 /* ================= GET ALL REVIEWED PAPERS (Admin decision page) ================= */
 export const getPapersWithReviews = async () => {
   try {
-    const reviewsSnap = await getDocs(collection(db, "reviews"));
-    const paperIds = [...new Set(reviewsSnap.docs.map(d => d.data().paperId))];
+    // Step 1: Fetch papers
+    const { data: papers, error: paperError } = await supabase
+      .from("papers")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-    const papers = [];
-    for (const paperId of paperIds) {
-      const paperDoc = await getDoc(doc(db, "submissions", paperId));
-      if (paperDoc.exists()) {
-        const paperReviews = reviewsSnap.docs
-          .filter(d => d.data().paperId === paperId)
-          .map(d => ({ id: d.id, ...d.data() }));
-        papers.push({
-          id: paperDoc.id,
-          ...paperDoc.data(),
-          reviews: paperReviews
-        });
+    if (paperError) throw paperError;
+    if (!papers || papers.length === 0) return [];
+
+    // Step 2: Fetch reviews for all papers
+    const { data: reviews, error: reviewError } = await supabase
+      .from("reviews")
+      .select("*");
+
+    if (reviewError) {
+      console.error("Error fetching reviews:", reviewError);
+    }
+
+    // Filter papers that have reviews
+    const reviewsMap = {};
+    (reviews || []).forEach(r => {
+      if (!reviewsMap[r.paper_id]) reviewsMap[r.paper_id] = [];
+      reviewsMap[r.paper_id].push(r);
+    });
+
+    const papersWithReviews = papers.filter(p => reviewsMap[p.id] && reviewsMap[p.id].length > 0);
+
+    if (papersWithReviews.length === 0) return [];
+
+    // Step 3: Get paper IDs for next queries
+    const paperIds = papersWithReviews.map(p => p.id);
+
+    // Step 4: Fetch editorial decisions
+    const { data: decisionsData, error: decisionsError } = await supabase
+      .from("editorial_decisions")
+      .select("*")
+      .in("paper_id", paperIds);
+
+    if (decisionsError) {
+      console.error("Error fetching editorial decisions:", decisionsError);
+    }
+
+    const decisionsMap = {};
+    (decisionsData || []).forEach(d => {
+      decisionsMap[d.paper_id] = d;
+    });
+
+    // Step 5: Fetch paper_authors separately
+    const { data: authorsData, error: authorsError } = await supabase
+      .from("paper_authors")
+      .select("*")
+      .in("paper_id", paperIds);
+
+    if (authorsError) {
+      console.error("Error fetching authors:", authorsError);
+    }
+
+    const authorsMap = {};
+    (authorsData || []).forEach(a => {
+      if (!authorsMap[a.paper_id]) authorsMap[a.paper_id] = [];
+      authorsMap[a.paper_id].push(a);
+    });
+
+    // Step 6: Fetch reviewers for reviews
+    const reviewIds = [];
+    (reviews || []).forEach(r => {
+      if (paperIds.includes(r.paper_id)) {
+        reviewIds.push(r.reviewer_id);
+      }
+    });
+
+    let reviewersData = [];
+    const uniqueReviewerIds = [...new Set(reviewIds.filter(Boolean))];
+    
+    if (uniqueReviewerIds.length > 0) {
+      const { data: users, error: usersError } = await supabase
+        .from("users")
+        .select("id, email, given_name, family_name")
+        .in("id", uniqueReviewerIds);
+
+      if (usersError) {
+        console.error("Error fetching reviewers:", usersError);
+      } else {
+        reviewersData = users || [];
       }
     }
-    return papers;
+
+    const reviewersMap = {};
+    reviewersData.forEach(u => { reviewersMap[u.id] = u; });
+
+    // Step 7: Fetch paper authors user data for authorName
+    const { data: paperAuthorsData, error: paperAuthorsError } = await supabase
+      .from("users")
+      .select("id, email, given_name, family_name")
+      .in("id", papersWithReviews.map(p => p.author_id).filter(Boolean));
+
+    if (paperAuthorsError) {
+      console.error("Error fetching paper authors:", paperAuthorsError);
+    }
+
+    const paperAuthorsMap = {};
+    (paperAuthorsData || []).forEach(u => { paperAuthorsMap[u.id] = u; });
+
+    // Step 8: Combine all data
+    return papersWithReviews.map(p => ({
+      ...p,
+      paper_authors: authorsMap[p.id] || [],
+      // Attach full author user object so admin pages
+      // (e.g. editorial decisions & publish flow) can
+      // access `paper.users.email`, `given_name`, etc.
+      users: paperAuthorsMap[p.author_id] || null,
+      reviews: (reviewsMap[p.id] || []).map(r => ({
+        ...r,
+        users: reviewersMap[r.reviewer_id] || null
+      })),
+      editorialDecision: decisionsMap[p.id]?.decision || null,
+      editorialComments: decisionsMap[p.id]?.comments || null,
+      authorName: `${paperAuthorsMap[p.author_id]?.given_name || ""} ${paperAuthorsMap[p.author_id]?.family_name || ""}`.trim() || "N/A"
+    }));
   } catch (error) {
     console.error("Error getting papers with reviews:", error);
     throw error;
@@ -309,31 +486,59 @@ export const getPapersWithReviews = async () => {
 };
 
 /* ================= ADMIN FINAL DECISION ================= */
-export const makeEditorialDecision = async (paperId, decision, comments = "") => {
+export const makeEditorialDecision = async (paperId, editorId, decision, comments = "") => {
   try {
     const newStatus =
       decision === "accept" ? "accepted" :
-      decision === "reject" ? "rejected" : "revision-required";
+      decision === "reject" ? "rejected" : "revision_requested";
 
-    await updateDoc(doc(db, "submissions", paperId), {
-      editorialDecision: decision,
-      editorialComments: comments,
-      decisionMadeAt: Timestamp.now(),
-      status: newStatus,
-      updatedAt: Timestamp.now()
-    });
+    // Step 1: Update paper status
+    const { error: paperError } = await supabase
+      .from("papers")
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq("id", paperId);
+    if (paperError) throw paperError;
 
-    // ✅ Send email to author
-    const paperDoc = await getDoc(doc(db, "submissions", paperId));
-    if (paperDoc.exists()) {
-      const paper = paperDoc.data();
-      await sendEditorialDecisionEmail({
-        authorEmail: paper.authorEmail,
-        authorName: paper.authorName,
-        paperTitle: paper.title,
+    // Step 2: Insert editorial decision
+    const { error: decisionError } = await supabase
+      .from("editorial_decisions")
+      .insert({
+        paper_id: paperId,
+        editor_id: editorId,
         decision,
         comments,
+        decided_at: new Date().toISOString()
       });
+    if (decisionError) throw decisionError;
+
+    // Step 3: Fetch paper and author info for email
+    const { data: paper } = await supabase
+      .from("papers")
+      .select("title, author_id")
+      .eq("id", paperId)
+      .single();
+
+    // Step 4: Send email notification (non-blocking)
+    if (paper && paper.author_id) {
+      const { data: userData } = await supabase
+        .from("users")
+        .select("email, given_name, family_name")
+        .eq("id", paper.author_id)
+        .single();
+
+      if (userData) {
+        try {
+          await sendEditorialDecisionEmail({
+            authorEmail: userData.email,
+            authorName: `${userData.given_name || ""} ${userData.family_name || ""}`.trim(),
+            paperTitle: paper.title,
+            decision,
+            comments
+          });
+        } catch (emailError) {
+          console.warn("⚠️ Email notification failed, but decision was recorded:", emailError.message);
+        }
+      }
     }
 
     return { success: true };

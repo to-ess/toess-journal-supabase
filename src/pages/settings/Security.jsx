@@ -1,12 +1,12 @@
-import { auth } from "../../services/firebase";
+import { supabase } from "../../services/supabase";
 import { Shield, Key, AlertTriangle } from "lucide-react";
-import { sendPasswordResetEmail } from "firebase/auth";
+
 
 export default function Security() {
-  const user = auth.currentUser;
+  const user = supabase.auth.getUser();
 
   const handleResetPassword = async () => {
-    await sendPasswordResetEmail(auth, user.email);
+    await supabase.auth.resetPasswordForEmail(user.email);
     alert("Password reset email sent.");
   };
 

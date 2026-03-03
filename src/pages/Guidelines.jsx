@@ -1,6 +1,7 @@
 import React from 'react';
 import { FileText, CheckCircle, Upload, Clock, AlertCircle, BookOpen, Download, Send, Shield, Scale } from "lucide-react";
 import SidebarLayout from '../layouts/SidebarLayout';
+import { Link } from "react-router-dom";
 
 export default function Guidelines() {
   const submissionSteps = [
@@ -104,7 +105,7 @@ export default function Guidelines() {
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-                    <span>Submit in <strong>Word format (.docx)</strong> using the <a href="#" className="text-indigo-600 hover:text-indigo-700 font-semibold underline">ToESS Template</a></span>
+                    <span>Submit in <strong>Word format (.docx)</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
@@ -275,22 +276,29 @@ export default function Guidelines() {
             <h2 className="text-2xl font-bold text-slate-900">Copyright and Licensing</h2>
           </div>
           
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-6">
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-6 mb-4">
             <ul className="space-y-3 text-slate-700">
               <li className="flex items-start gap-2">
                 <Shield className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
-                <span><strong>Authors retain copyright</strong> of their work</span>
+                <span>Upon acceptance, <strong>copyright is transferred to the Journal</strong></span>
               </li>
               <li className="flex items-start gap-2">
                 <Shield className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
-                <span>ToESS holds <strong>publication rights</strong></span>
+                <span>Authors retain the right to use the work for <strong>educational and research purposes</strong></span>
               </li>
               <li className="flex items-start gap-2">
                 <Shield className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
-                <span>Publications are under a <strong>Creative Commons Attribution 4.0 License</strong></span>
+                <span>All publications are licensed under the <strong>Creative Commons Attribution 4.0 International License (CC BY 4.0)</strong></span>
               </li>
             </ul>
           </div>
+          <Link
+            to="/copyright-policy"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-800 underline underline-offset-2"
+          >
+            <Scale className="w-4 h-4" />
+            Read the full Copyright & Licensing Policy →
+          </Link>
         </div>
 
         {/* Reference Style */}

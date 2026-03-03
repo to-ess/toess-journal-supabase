@@ -1,6 +1,6 @@
 import { useParams } from "react-router-dom";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "../services/firebase";
+
+import { supabase } from "../services/supabase";
 import { useEffect, useState } from "react";
 
 export default function PaperDetail() {

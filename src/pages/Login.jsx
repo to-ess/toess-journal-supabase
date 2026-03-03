@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { loginUser, signInWithGoogle } from "../services/authService";
-import { getUserRole, saveUserProfile } from "../services/userService";
-import { Link, useNavigate } from "react-router-dom";
+import { getUserRole } from "../services/userService";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 const ROUTES = {
   ADMIN_DASHBOARD: "/dashboard/admin",
@@ -10,7 +10,6 @@ const ROUTES = {
   FORGOT_PASSWORD: "/forgot-password"
 };
 
-// Google "G" SVG logo
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
     <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -21,6 +20,11 @@ const GoogleIcon = () => (
   </svg>
 );
 
+const ERROR_MESSAGES = {
+  no_session: "Sign-in failed. Please try again.",
+  oauth_failed: "Google sign-in failed. Please try again.",
+};
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,13 +33,18 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Show error from OAuth callback redirect if present
+  const callbackError = searchParams.get("error");
+  const displayError = error || (callbackError ? ERROR_MESSAGES[callbackError] ?? "Sign-in failed. Please try again." : "");
 
   const handleEmailChange = (e) => { setEmail(e.target.value); if (error) setError(""); };
   const handlePasswordChange = (e) => { setPassword(e.target.value); if (error) setError(""); };
 
   const redirectByRole = async (user) => {
-    const role = await getUserRole(user.uid);
-    navigate(role === "admin" ? ROUTES.ADMIN_DASHBOARD : ROUTES.AUTHOR_DASHBOARD);
+    const role = await getUserRole(user.id);
+    navigate(role === "admin" ? ROUTES.ADMIN_DASHBOARD : ROUTES.AUTHOR_DASHBOARD, { replace: true });
   };
 
   const validateInputs = () => {
@@ -53,28 +62,24 @@ export default function Login() {
       const user = await loginUser(email, password);
       await redirectByRole(user);
     } catch (err) {
-      if (err.code === "auth/user-not-found") setError("No account found with this email");
-      else if (err.code === "auth/wrong-password") setError("Incorrect password");
-      else if (err.code === "auth/too-many-requests") setError("Too many failed attempts. Please try again later");
-      else if (err.code === "auth/invalid-credential") setError("Invalid email or password");
+      if (err.message?.includes("Invalid login credentials")) setError("Invalid email or password");
+      else if (err.message?.includes("Email not confirmed")) setError("Please verify your email before logging in");
+      else if (err.message?.includes("Too many requests")) setError("Too many attempts. Please try again later");
       else setError(err.message || "Login failed. Please try again");
     } finally {
       setLoading(false);
     }
   };
 
+  // Google login just triggers the redirect — no async result to handle here
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     setError("");
     try {
-      const user = await signInWithGoogle();
-      // Save/update profile in Firestore (merge: true so existing data isn't overwritten)
-      await saveUserProfile(user);
-      await redirectByRole(user);
+      await signInWithGoogle();
+      // Browser will redirect to Google — execution stops here
     } catch (err) {
-      if (err.code === "auth/popup-closed-by-user") setError("Sign-in cancelled");
-      else setError("Google sign-in failed. Please try again.");
-    } finally {
+      setError("Google sign-in failed. Please try again.");
       setGoogleLoading(false);
     }
   };
@@ -86,10 +91,10 @@ export default function Login() {
       <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-sm border">
         <h2 className="text-2xl font-bold mb-6 text-center">Login to ToESS</h2>
 
-        {error && (
+        {displayError && (
           <p id="error-message" role="alert"
             className="mb-4 text-sm text-center text-red-600 bg-red-50 p-3 rounded-lg">
-            {error}
+            {displayError}
           </p>
         )}
 
@@ -106,7 +111,7 @@ export default function Login() {
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
           ) : <GoogleIcon />}
-          {googleLoading ? "Signing in..." : "Continue with Google"}
+          {googleLoading ? "Redirecting to Google..." : "Continue with Google"}
         </button>
 
         {/* Divider */}
@@ -125,7 +130,7 @@ export default function Login() {
                 id="email" type="email" required placeholder="Email address"
                 className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 value={email} onChange={handleEmailChange}
-                aria-describedby={error ? "error-message" : undefined}
+                aria-describedby={displayError ? "error-message" : undefined}
               />
             </div>
 
