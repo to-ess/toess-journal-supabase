@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import Lottie from "lottie-react";
+import loadingAnimation from "../assets/lottie/loading.json";
 import { getPublishedPapers } from "../services/submissionService";
 import {
   Search,
@@ -16,21 +18,28 @@ import {
   Users,
   Clock,
   Bookmark,
-  TrendingUp
+  TrendingUp,
 } from "lucide-react";
 
 export default function Archives() {
   const [papers, setPapers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [authReady, setAuthReady] = useState(false);
+  const [minTimerDone, setMinTimerDone] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
   const [selectedPaper, setSelectedPaper] = useState(null);
 
+  const loading = !authReady || !minTimerDone;
+
   /* ================= FORMAT AUTHORS ================= */
   const formatAuthors = (paper) => {
-    if (paper.paper_authors && Array.isArray(paper.paper_authors) && paper.paper_authors.length > 0) {
-      return paper.paper_authors.map(a => a.full_name).join(", ");
+    if (
+      paper.paper_authors &&
+      Array.isArray(paper.paper_authors) &&
+      paper.paper_authors.length > 0
+    ) {
+      return paper.paper_authors.map((a) => a.full_name).join(", ");
     }
     if (paper.users) {
       return `${paper.users.given_name || ""} ${paper.users.family_name || ""}`.trim();
@@ -43,10 +52,10 @@ export default function Archives() {
     if (!timestamp) return "Date unavailable";
     try {
       const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-      return date.toLocaleDateString("en-US", { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
       });
     } catch {
       return "Date unavailable";
@@ -55,7 +64,10 @@ export default function Archives() {
 
   /* ================= LOAD PAPERS ================= */
   useEffect(() => {
+    // Minimum 2 seconds loader
+    const timer = setTimeout(() => setMinTimerDone(true), 2000);
     load();
+    return () => clearTimeout(timer);
   }, []);
 
   const load = async () => {
@@ -66,21 +78,23 @@ export default function Archives() {
     } catch (error) {
       console.error(error);
     } finally {
-      setLoading(false);
+      setAuthReady(true);
     }
   };
 
   /* ================= FILTERING ================= */
-  const categories = [...new Set(papers.map(p => p.category).filter(Boolean))].sort();
+  const categories = [
+    ...new Set(papers.map((p) => p.category).filter(Boolean)),
+  ].sort();
 
   let filtered = papers.filter((p) => {
     const authorText = formatAuthors(p).toLowerCase();
-    const keywordsText = Array.isArray(p.keywords) 
+    const keywordsText = Array.isArray(p.keywords)
       ? p.keywords.join(" ").toLowerCase()
       : typeof p.keywords === "string"
-      ? p.keywords.toLowerCase()
-      : "";
-    
+        ? p.keywords.toLowerCase()
+        : "";
+
     return (
       p.title?.toLowerCase().includes(search.toLowerCase()) ||
       authorText.includes(search.toLowerCase()) ||
@@ -90,13 +104,12 @@ export default function Archives() {
   });
 
   if (selectedCategory !== "all") {
-    filtered = filtered.filter(p => p.category === selectedCategory);
+    filtered = filtered.filter((p) => p.category === selectedCategory);
   }
 
   filtered.sort((a, b) => {
-    if (sortBy === "title")
-      return (a.title || "").localeCompare(b.title || "");
-    
+    if (sortBy === "title") return (a.title || "").localeCompare(b.title || "");
+
     const dateA = new Date(a.updated_at || a.created_at || 0).getTime();
     const dateB = new Date(b.updated_at || b.created_at || 0).getTime();
     return sortBy === "oldest" ? dateA - dateB : dateB - dateA;
@@ -106,19 +119,21 @@ export default function Archives() {
   const stats = {
     total: papers.length,
     categories: categories.length,
-    thisYear: papers.filter(p => {
+    thisYear: papers.filter((p) => {
       const year = new Date(p.updated_at || p.created_at).getFullYear();
       return year === new Date().getFullYear();
-    }).length
+    }).length,
   };
 
   /* ================= LOADING ================= */
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-        <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading publications...</p>
+      <div className="h-screen flex items-center justify-center bg-white">
+        <div className="w-64">
+          <Lottie animationData={loadingAnimation} loop={true} speed={3} />
+          <p className="text-center text-gray-600 mt-4 font-medium">
+            Loading publications...
+          </p>
         </div>
       </div>
     );
@@ -127,7 +142,6 @@ export default function Archives() {
   /* ================= UI ================= */
   return (
     <div className="bg-gray-50 min-h-screen">
-      
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-indigo-700 to-blue-700 text-white">
         <div className="max-w-7xl mx-auto px-6 py-16">
@@ -136,8 +150,8 @@ export default function Archives() {
             <h1 className="text-4xl font-bold">Published Archives</h1>
           </div>
           <p className="text-blue-100 text-lg mb-8 max-w-3xl">
-            Browse our collection of peer-reviewed research papers in evolutionary algorithms, 
-            artificial intelligence, and smart systems.
+            Browse our collection of peer-reviewed research papers in
+            evolutionary algorithms, artificial intelligence, and smart systems.
           </p>
 
           {/* Stats */}
@@ -174,7 +188,6 @@ export default function Archives() {
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-10">
-        
         {/* Search and Filters */}
         <div className="bg-white rounded-xl shadow-sm border p-6 mb-8">
           {/* Search Bar */}
@@ -201,8 +214,10 @@ export default function Archives() {
               className="border-2 border-gray-200 px-4 py-2 rounded-lg focus:border-indigo-500 focus:outline-none transition"
             >
               <option value="all">All Categories</option>
-              {categories.map(c => (
-                <option key={c} value={c}>{c}</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
               ))}
             </select>
 
@@ -218,7 +233,7 @@ export default function Archives() {
 
             <div className="ml-auto flex items-center gap-2">
               <span className="text-sm text-gray-600">
-                {filtered.length} {filtered.length === 1 ? 'paper' : 'papers'}
+                {filtered.length} {filtered.length === 1 ? "paper" : "papers"}
               </span>
             </div>
           </div>
@@ -228,14 +243,18 @@ export default function Archives() {
         {filtered.length === 0 && (
           <div className="text-center py-16 bg-white rounded-xl shadow-sm border">
             <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No papers found</h3>
-            <p className="text-gray-600">Try adjusting your search or filters</p>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              No papers found
+            </h3>
+            <p className="text-gray-600">
+              Try adjusting your search or filters
+            </p>
           </div>
         )}
 
         {/* Papers Grid */}
         <div className="grid gap-6">
-          {filtered.map(p => (
+          {filtered.map((p) => (
             <article
               key={p.id}
               className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg hover:border-indigo-200 transition-all duration-200"
@@ -246,14 +265,14 @@ export default function Archives() {
                   <h2 className="text-xl font-bold text-gray-900 mb-2 hover:text-indigo-600 transition cursor-pointer">
                     {p.title}
                   </h2>
-                  
+
                   {/* Meta Information */}
                   <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
                     <span className="flex items-center gap-1.5">
                       <Users className="w-4 h-4 text-gray-400" />
                       {formatAuthors(p)}
                     </span>
-                    
+
                     <span className="flex items-center gap-1.5">
                       <Calendar className="w-4 h-4 text-gray-400" />
                       {formatDate(p.updated_at || p.created_at)}
@@ -277,21 +296,25 @@ export default function Archives() {
               )}
 
               {/* Keywords */}
-              {p.keywords && (Array.isArray(p.keywords) ? p.keywords.length : 0) > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {(Array.isArray(p.keywords) ? p.keywords : p.keywords.split(","))
-                    .slice(0, 5)
-                    .map((kw, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs"
-                      >
-                        <Tag className="w-3 h-3" />
-                        {typeof kw === "string" ? kw.trim() : kw}
-                      </span>
-                    ))}
-                </div>
-              )}
+              {p.keywords &&
+                (Array.isArray(p.keywords) ? p.keywords.length : 0) > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {(Array.isArray(p.keywords)
+                      ? p.keywords
+                      : p.keywords.split(",")
+                    )
+                      .slice(0, 5)
+                      .map((kw, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs"
+                        >
+                          <Tag className="w-3 h-3" />
+                          {typeof kw === "string" ? kw.trim() : kw}
+                        </span>
+                      ))}
+                  </div>
+                )}
 
               {/* Actions */}
               <div className="flex gap-3 pt-4 border-t border-gray-100">
@@ -338,7 +361,9 @@ export default function Archives() {
                     </span>
                     <span className="flex items-center gap-1.5">
                       <Calendar className="w-4 h-4" />
-                      {formatDate(selectedPaper.updated_at || selectedPaper.created_at)}
+                      {formatDate(
+                        selectedPaper.updated_at || selectedPaper.created_at,
+                      )}
                     </span>
                   </div>
                 </div>
@@ -357,26 +382,38 @@ export default function Archives() {
               <div className="grid md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
                 {selectedPaper.category && (
                   <div>
-                    <span className="text-sm font-semibold text-gray-600">Category</span>
+                    <span className="text-sm font-semibold text-gray-600">
+                      Category
+                    </span>
                     <p className="text-gray-900">{selectedPaper.category}</p>
                   </div>
                 )}
                 {selectedPaper.article_type && (
                   <div>
-                    <span className="text-sm font-semibold text-gray-600">Article Type</span>
-                    <p className="text-gray-900">{selectedPaper.article_type}</p>
+                    <span className="text-sm font-semibold text-gray-600">
+                      Article Type
+                    </span>
+                    <p className="text-gray-900">
+                      {selectedPaper.article_type}
+                    </p>
                   </div>
                 )}
                 {selectedPaper.status === "published" && (
                   <div>
-                    <span className="text-sm font-semibold text-gray-600">Status</span>
+                    <span className="text-sm font-semibold text-gray-600">
+                      Status
+                    </span>
                     <p className="text-gray-900">Published</p>
                   </div>
                 )}
                 {selectedPaper.updated_at && (
                   <div>
-                    <span className="text-sm font-semibold text-gray-600">Published Date</span>
-                    <p className="text-gray-900">{formatDate(selectedPaper.updated_at)}</p>
+                    <span className="text-sm font-semibold text-gray-600">
+                      Published Date
+                    </span>
+                    <p className="text-gray-900">
+                      {formatDate(selectedPaper.updated_at)}
+                    </p>
                   </div>
                 )}
               </div>
@@ -384,7 +421,9 @@ export default function Archives() {
               {/* Abstract */}
               {selectedPaper.abstract && (
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-3">Abstract</h3>
+                  <h3 className="text-lg font-bold text-gray-900 mb-3">
+                    Abstract
+                  </h3>
                   <p className="text-gray-700 leading-relaxed">
                     {selectedPaper.abstract}
                   </p>
@@ -392,12 +431,19 @@ export default function Archives() {
               )}
 
               {/* Keywords */}
-              {selectedPaper.keywords && (Array.isArray(selectedPaper.keywords) ? selectedPaper.keywords.length : 0) > 0 && (
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-3">Keywords</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {(Array.isArray(selectedPaper.keywords) ? selectedPaper.keywords : selectedPaper.keywords.split(","))
-                      .map((kw, idx) => (
+              {selectedPaper.keywords &&
+                (Array.isArray(selectedPaper.keywords)
+                  ? selectedPaper.keywords.length
+                  : 0) > 0 && (
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900 mb-3">
+                      Keywords
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {(Array.isArray(selectedPaper.keywords)
+                        ? selectedPaper.keywords
+                        : selectedPaper.keywords.split(",")
+                      ).map((kw, idx) => (
                         <span
                           key={idx}
                           className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-full text-sm font-medium"
@@ -406,37 +452,51 @@ export default function Archives() {
                           {typeof kw === "string" ? kw.trim() : kw}
                         </span>
                       ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* Authors Details */}
-              {selectedPaper.paper_authors && selectedPaper.paper_authors.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-3">Authors</h3>
-                  <div className="space-y-3">
-                    {selectedPaper.paper_authors.map((author, idx) => (
-                      <div key={idx} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                        <div className="w-10 h-10 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold">
-                          {(author.full_name?.[0] || '?').toUpperCase()}
+              {selectedPaper.paper_authors &&
+                selectedPaper.paper_authors.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900 mb-3">
+                      Authors
+                    </h3>
+                    <div className="space-y-3">
+                      {selectedPaper.paper_authors.map((author, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg"
+                        >
+                          <div className="w-10 h-10 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold">
+                            {(author.full_name?.[0] || "?").toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-gray-900">
+                              {author.full_name}
+                              {author.is_corresponding && (
+                                <span className="text-xs text-indigo-600 ml-2">
+                                  (Corresponding)
+                                </span>
+                              )}
+                            </p>
+                            {author.institution && (
+                              <p className="text-sm text-gray-600">
+                                {author.institution}
+                              </p>
+                            )}
+                            {author.email && (
+                              <p className="text-sm text-gray-500">
+                                {author.email}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-semibold text-gray-900">
-                            {author.full_name}
-                            {author.is_corresponding && <span className="text-xs text-indigo-600 ml-2">(Corresponding)</span>}
-                          </p>
-                          {author.institution && (
-                            <p className="text-sm text-gray-600">{author.institution}</p>
-                          )}
-                          {author.email && (
-                            <p className="text-sm text-gray-500">{author.email}</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* Actions */}
               <div className="flex gap-3 pt-4 border-t">

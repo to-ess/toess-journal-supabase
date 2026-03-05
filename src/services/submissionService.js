@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { sendSubmissionConfirmationEmail } from "./emailService";
 
 /**
  * Create a manuscript submission
@@ -7,7 +8,9 @@ export async function createSubmission(data) {
   console.log("📤 Creating submission:", data);
 
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) throw new Error("Not authenticated");
 
     // Step 1: Create paper
@@ -24,7 +27,7 @@ export async function createSubmission(data) {
         manuscript_id: data.manuscriptId || null,
         file_url: data.fileUrl || null,
         status: "submitted",
-        author_id: user.id
+        author_id: user.id,
       })
       .select()
       .single();
@@ -33,18 +36,44 @@ export async function createSubmission(data) {
 
     // Step 2: Add co-authors
     if (data.authors && data.authors.length > 0) {
-      const authorRows = data.authors.map(author => ({
+      const authorRows = data.authors.map((author) => ({
         paper_id: paper.id,
         full_name: `${author.firstName} ${author.lastName}`.trim(),
         email: author.email,
         institution: author.institution,
-        is_corresponding: author.isCorresponding || false
+        is_corresponding: author.isCorresponding || false,
       }));
-      const { error: authorsError } = await supabase.from("paper_authors").insert(authorRows);
+      const { error: authorsError } = await supabase
+        .from("paper_authors")
+        .insert(authorRows);
       if (authorsError) throw authorsError;
     }
 
     console.log("✅ Submission created:", paper.id);
+
+    // Step 3: Send confirmation email (non-blocking)
+    try {
+      const { data: userData } = await supabase
+        .from("users")
+        .select("email, given_name, family_name")
+        .eq("id", user.id)
+        .single();
+
+      await sendSubmissionConfirmationEmail({
+        paperId: paper.id,
+        paperTitle: data.title,
+        authorEmail: userData?.email,
+        authorName: userData
+          ? `${userData.given_name || ""} ${userData.family_name || ""}`.trim()
+          : "Author",
+      });
+    } catch (emailError) {
+      console.warn(
+        "⚠️ Confirmation email failed (non-blocking):",
+        emailError.message,
+      );
+    }
+
     return { success: true, paperId: paper.id };
   } catch (error) {
     console.error("❌ Submission error:", error);
@@ -57,7 +86,6 @@ export async function createSubmission(data) {
  */
 export async function getAuthorSubmissions(authorId) {
   try {
-    // Step 1: Fetch papers
     const { data: papers, error: paperError } = await supabase
       .from("papers")
       .select("*")
@@ -67,26 +95,21 @@ export async function getAuthorSubmissions(authorId) {
     if (paperError) throw paperError;
     if (!papers || papers.length === 0) return [];
 
-    // Step 2: Fetch authors separately
-    const paperIds = papers.map(p => p.id);
-    const { data: authorsData, error: authorsError } = await supabase
+    const paperIds = papers.map((p) => p.id);
+    const { data: authorsData } = await supabase
       .from("paper_authors")
       .select("*")
       .in("paper_id", paperIds);
 
-    if (authorsError) console.error("Error fetching authors:", authorsError);
-
-    // Build authors map
     const authorsMap = {};
-    (authorsData || []).forEach(a => {
+    (authorsData || []).forEach((a) => {
       if (!authorsMap[a.paper_id]) authorsMap[a.paper_id] = [];
       authorsMap[a.paper_id].push(a);
     });
 
-    // Merge data
-    return papers.map(p => ({
+    return papers.map((p) => ({
       ...p,
-      paper_authors: authorsMap[p.id] || []
+      paper_authors: authorsMap[p.id] || [],
     }));
   } catch (error) {
     console.error("Error in getAuthorSubmissions:", error);
@@ -101,7 +124,6 @@ export const getMySubmissions = getAuthorSubmissions;
  */
 export async function getAllSubmissions() {
   try {
-    // Step 1: Fetch all papers
     const { data: papers, error: paperError } = await supabase
       .from("papers")
       .select("*")
@@ -110,41 +132,38 @@ export async function getAllSubmissions() {
     if (paperError) throw paperError;
     if (!papers || papers.length === 0) return [];
 
-    // Step 2: Fetch paper authors separately
-    const paperIds = papers.map(p => p.id);
-    const { data: authorsData, error: authorsError } = await supabase
+    const paperIds = papers.map((p) => p.id);
+
+    const { data: authorsData } = await supabase
       .from("paper_authors")
       .select("*")
       .in("paper_id", paperIds);
 
-    if (authorsError) console.error("Error fetching authors:", authorsError);
-
     const authorsMap = {};
-    (authorsData || []).forEach(a => {
+    (authorsData || []).forEach((a) => {
       if (!authorsMap[a.paper_id]) authorsMap[a.paper_id] = [];
       authorsMap[a.paper_id].push(a);
     });
 
-    // Step 3: Fetch users separately for author info
-    const authorIds = [...new Set(papers.map(p => p.author_id).filter(Boolean))];
+    const authorIds = [
+      ...new Set(papers.map((p) => p.author_id).filter(Boolean)),
+    ];
     let usersMap = {};
-    
+
     if (authorIds.length > 0) {
-      const { data: usersData, error: usersError } = await supabase
+      const { data: usersData } = await supabase
         .from("users")
         .select("id, email, given_name, family_name")
         .in("id", authorIds);
-
-      if (usersError) console.error("Error fetching users:", usersError);
-      
-      (usersData || []).forEach(u => { usersMap[u.id] = u; });
+      (usersData || []).forEach((u) => {
+        usersMap[u.id] = u;
+      });
     }
 
-    // Step 4: Merge all data
-    return papers.map(p => ({
+    return papers.map((p) => ({
       ...p,
       paper_authors: authorsMap[p.id] || [],
-      users: usersMap[p.author_id] || null
+      users: usersMap[p.author_id] || null,
     }));
   } catch (error) {
     console.error("Error getting all submissions:", error);
@@ -157,7 +176,6 @@ export async function getAllSubmissions() {
  */
 export async function getSubmission(submissionId) {
   try {
-    // Step 1: Fetch paper
     const { data: paper, error: paperError } = await supabase
       .from("papers")
       .select("*")
@@ -166,26 +184,19 @@ export async function getSubmission(submissionId) {
 
     if (paperError) throw new Error("Submission not found");
 
-    // Step 2: Fetch authors separately
-    const { data: authorsData, error: authorsError } = await supabase
+    const { data: authorsData } = await supabase
       .from("paper_authors")
       .select("*")
       .eq("paper_id", submissionId);
 
-    if (authorsError) console.error("Error fetching authors:", authorsError);
-
     paper.paper_authors = authorsData || [];
 
-    // Step 3: Fetch user separately
     if (paper.author_id) {
-      const { data: userData, error: userError } = await supabase
+      const { data: userData } = await supabase
         .from("users")
         .select("id, email, given_name, family_name")
         .eq("id", paper.author_id)
         .single();
-      
-      if (userError) console.error("Error fetching user:", userError);
-      
       paper.users = userData || null;
     }
 
@@ -200,32 +211,22 @@ export async function getSubmission(submissionId) {
  * Update submission status
  */
 export async function updateSubmissionStatus(submissionId, status) {
-  try {
-    const { error } = await supabase
-      .from("papers")
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq("id", submissionId);
-    if (error) throw error;
-  } catch (error) {
-    console.error("Error updating submission status:", error);
-    throw error;
-  }
+  const { error } = await supabase
+    .from("papers")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", submissionId);
+  if (error) throw error;
 }
 
 /**
  * Update submission with any data
  */
 export async function updateSubmission(submissionId, data) {
-  try {
-    const { error } = await supabase
-      .from("papers")
-      .update({ ...data, updated_at: new Date().toISOString() })
-      .eq("id", submissionId);
-    if (error) throw error;
-  } catch (error) {
-    console.error("Error updating submission:", error);
-    throw error;
-  }
+  const { error } = await supabase
+    .from("papers")
+    .update({ ...data, updated_at: new Date().toISOString() })
+    .eq("id", submissionId);
+  if (error) throw error;
 }
 
 /**
@@ -233,40 +234,31 @@ export async function updateSubmission(submissionId, data) {
  */
 export async function getPublishedPapers() {
   try {
-    // Step 1: Fetch published papers
-    const { data: papers, error: paperError } = await supabase
+    const { data: papers, error } = await supabase
       .from("papers")
       .select("*")
       .eq("status", "published")
       .order("created_at", { ascending: false });
 
-    if (paperError) {
-      console.error("❌ Error fetching published papers:", paperError);
+    if (error) {
+      console.error("❌ Error fetching published papers:", error);
       return [];
     }
-
     if (!papers || papers.length === 0) return [];
 
-    // Step 2: Fetch authors separately
-    const paperIds = papers.map(p => p.id);
-    const { data: authorsData, error: authorsError } = await supabase
+    const paperIds = papers.map((p) => p.id);
+    const { data: authorsData } = await supabase
       .from("paper_authors")
       .select("*")
       .in("paper_id", paperIds);
 
-    if (authorsError) console.error("Error fetching authors:", authorsError);
-
     const authorsMap = {};
-    (authorsData || []).forEach(a => {
+    (authorsData || []).forEach((a) => {
       if (!authorsMap[a.paper_id]) authorsMap[a.paper_id] = [];
       authorsMap[a.paper_id].push(a);
     });
 
-    // Step 3: Merge data
-    return papers.map(p => ({
-      ...p,
-      paper_authors: authorsMap[p.id] || []
-    }));
+    return papers.map((p) => ({ ...p, paper_authors: authorsMap[p.id] || [] }));
   } catch (error) {
     console.error("Error in getPublishedPapers:", error);
     return [];
@@ -277,41 +269,28 @@ export async function getPublishedPapers() {
  * Get submissions by status
  */
 export async function getSubmissionsByStatus(status) {
-  try {
-    // Step 1: Fetch papers with status
-    const { data: papers, error: paperError } = await supabase
-      .from("papers")
-      .select("*")
-      .eq("status", status)
-      .order("created_at", { ascending: false });
+  const { data: papers, error } = await supabase
+    .from("papers")
+    .select("*")
+    .eq("status", status)
+    .order("created_at", { ascending: false });
 
-    if (paperError) throw paperError;
-    if (!papers || papers.length === 0) return [];
+  if (error) throw error;
+  if (!papers || papers.length === 0) return [];
 
-    // Step 2: Fetch authors separately
-    const paperIds = papers.map(p => p.id);
-    const { data: authorsData, error: authorsError } = await supabase
-      .from("paper_authors")
-      .select("*")
-      .in("paper_id", paperIds);
+  const paperIds = papers.map((p) => p.id);
+  const { data: authorsData } = await supabase
+    .from("paper_authors")
+    .select("*")
+    .in("paper_id", paperIds);
 
-    if (authorsError) console.error("Error fetching authors:", authorsError);
+  const authorsMap = {};
+  (authorsData || []).forEach((a) => {
+    if (!authorsMap[a.paper_id]) authorsMap[a.paper_id] = [];
+    authorsMap[a.paper_id].push(a);
+  });
 
-    const authorsMap = {};
-    (authorsData || []).forEach(a => {
-      if (!authorsMap[a.paper_id]) authorsMap[a.paper_id] = [];
-      authorsMap[a.paper_id].push(a);
-    });
-
-    // Step 3: Merge data
-    return papers.map(p => ({
-      ...p,
-      paper_authors: authorsMap[p.id] || []
-    }));
-  } catch (error) {
-    console.error("Error in getSubmissionsByStatus:", error);
-    throw error;
-  }
+  return papers.map((p) => ({ ...p, paper_authors: authorsMap[p.id] || [] }));
 }
 
 export async function getPendingPapers() {
@@ -322,29 +301,22 @@ export async function getPendingPapers() {
  * Delete a submission
  */
 export async function deleteSubmission(submissionId) {
-  try {
-    const { error } = await supabase.from("papers").delete().eq("id", submissionId);
-    if (error) throw error;
-  } catch (error) {
-    console.error("Error deleting submission:", error);
-    throw error;
-  }
+  const { error } = await supabase
+    .from("papers")
+    .delete()
+    .eq("id", submissionId);
+  if (error) throw error;
 }
 
 /**
  * Get submission by manuscript_id
  */
 export async function getSubmissionByManuscriptId(manuscriptId) {
-  try {
-    const { data, error } = await supabase
-      .from("papers")
-      .select("*")
-      .eq("manuscript_id", manuscriptId)
-      .single();
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error("Error fetching submission by manuscript ID:", error);
-    throw error;
-  }
+  const { data, error } = await supabase
+    .from("papers")
+    .select("*")
+    .eq("manuscript_id", manuscriptId)
+    .single();
+  if (error) throw error;
+  return data;
 }

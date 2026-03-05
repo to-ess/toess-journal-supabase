@@ -1,5 +1,8 @@
 import { supabase } from "./supabase";
-import { sendReviewerAssignedEmail, sendEditorialDecisionEmail } from "./emailService";
+import {
+  sendReviewerAssignedEmail,
+  sendEditorialDecisionEmail,
+} from "./emailService";
 
 /* ================= REVIEWER REGISTRATION ================= */
 export const registerAsReviewer = async (userId, formData) => {
@@ -9,7 +12,7 @@ export const registerAsReviewer = async (userId, formData) => {
       designation: formData.designation,
       institution: formData.institution,
       qualifications: formData.qualifications,
-      status: "pending"
+      status: "pending",
     });
     if (error) throw error;
     return { success: true };
@@ -26,7 +29,7 @@ export const getReviewerRequestStatus = async (userId) => {
       .from("reviewer_requests")
       .select("*")
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
     if (error) return null;
     return data;
   } catch (error) {
@@ -103,7 +106,12 @@ export const getRegisteredReviewers = async () => {
 };
 
 /* ================= ASSIGN PAPER TO REVIEWER (Admin) ================= */
-export const assignPaperToReviewer = async (paperId, reviewerEmail, reviewerName, deadline) => {
+export const assignPaperToReviewer = async (
+  paperId,
+  reviewerEmail,
+  reviewerName,
+  deadline,
+) => {
   try {
     const { data: reviewer, error: reviewerError } = await supabase
       .from("users")
@@ -119,7 +127,7 @@ export const assignPaperToReviewer = async (paperId, reviewerEmail, reviewerName
         reviewer_id: reviewer.id,
         assigned_at: new Date().toISOString(),
         deadline: new Date(deadline).toISOString(),
-        status: "pending"
+        status: "pending",
       })
       .select()
       .single();
@@ -142,7 +150,7 @@ export const assignPaperToReviewer = async (paperId, reviewerEmail, reviewerName
       reviewerName,
       paperTitle: paper?.title || "Untitled",
       paperId,
-      deadline
+      deadline,
     });
 
     return { success: true, assignmentId: assignment.id };
@@ -159,23 +167,25 @@ export const getAllAssignments = async () => {
       .from("reviewer_assignments")
       .select("*")
       .order("assigned_at", { ascending: false });
-    
+
     if (error) {
       console.error("Error fetching assignments:", error);
       throw error;
     }
-    
+
     if (!assignments || assignments.length === 0) return [];
 
-    const reviewerIds = [...new Set(assignments.map(a => a.reviewer_id).filter(Boolean))];
+    const reviewerIds = [
+      ...new Set(assignments.map((a) => a.reviewer_id).filter(Boolean)),
+    ];
     let reviewersData = [];
-    
+
     if (reviewerIds.length > 0) {
       const { data: users, error: usersError } = await supabase
         .from("users")
         .select("id, email, given_name, family_name")
         .in("id", reviewerIds);
-      
+
       if (usersError) {
         console.error("Error fetching reviewers:", usersError);
       } else {
@@ -184,17 +194,21 @@ export const getAllAssignments = async () => {
     }
 
     const reviewersMap = {};
-    reviewersData.forEach(u => { reviewersMap[u.id] = u; });
+    reviewersData.forEach((u) => {
+      reviewersMap[u.id] = u;
+    });
 
-    const paperIds = [...new Set(assignments.map(a => a.paper_id).filter(Boolean))];
+    const paperIds = [
+      ...new Set(assignments.map((a) => a.paper_id).filter(Boolean)),
+    ];
     let papersData = [];
-    
+
     if (paperIds.length > 0) {
       const { data: papers, error: papersError } = await supabase
         .from("papers")
         .select("id, title, status")
         .in("id", paperIds);
-      
+
       if (papersError) {
         console.error("Error fetching papers:", papersError);
       } else {
@@ -203,12 +217,14 @@ export const getAllAssignments = async () => {
     }
 
     const papersMap = {};
-    papersData.forEach(p => { papersMap[p.id] = p; });
+    papersData.forEach((p) => {
+      papersMap[p.id] = p;
+    });
 
-    return assignments.map(a => ({
+    return assignments.map((a) => ({
       ...a,
       users: reviewersMap[a.reviewer_id] || null,
-      papers: papersMap[a.paper_id] || null
+      papers: papersMap[a.paper_id] || null,
     }));
   } catch (error) {
     console.error("Error getting all assignments:", error);
@@ -224,7 +240,8 @@ export const getReviewerAssignments = async (email) => {
       .select("id")
       .eq("email", email)
       .single();
-    if (userError || !userData) throw new Error("User not found for email: " + email);
+    if (userError || !userData)
+      throw new Error("User not found for email: " + email);
 
     const { data: assignments, error: assignError } = await supabase
       .from("reviewer_assignments")
@@ -235,11 +252,15 @@ export const getReviewerAssignments = async (email) => {
     if (assignError) throw assignError;
     if (!assignments || assignments.length === 0) return [];
 
-    const paperIds = [...new Set(assignments.map(a => a.paper_id).filter(Boolean))];
+    const paperIds = [
+      ...new Set(assignments.map((a) => a.paper_id).filter(Boolean)),
+    ];
 
     const { data: papersData, error: papersError } = await supabase
       .from("papers")
-      .select("id, title, abstract, article_type, category, keywords, status, file_url")
+      .select(
+        "id, title, abstract, article_type, category, keywords, status, file_url",
+      )
       .in("id", paperIds);
 
     if (papersError) {
@@ -247,7 +268,9 @@ export const getReviewerAssignments = async (email) => {
     }
 
     const papersMap = {};
-    (papersData || []).forEach(p => { papersMap[p.id] = p; });
+    (papersData || []).forEach((p) => {
+      papersMap[p.id] = p;
+    });
 
     const { data: authorsData, error: authorsError } = await supabase
       .from("paper_authors")
@@ -259,16 +282,16 @@ export const getReviewerAssignments = async (email) => {
     }
 
     const authorsMap = {};
-    (authorsData || []).forEach(a => {
+    (authorsData || []).forEach((a) => {
       if (!authorsMap[a.paper_id]) authorsMap[a.paper_id] = [];
       authorsMap[a.paper_id].push(a);
     });
 
-    return assignments.map(a => {
+    return assignments.map((a) => {
       const p = papersMap[a.paper_id];
       const authors = authorsMap[a.paper_id] || [];
       const correspondingAuthor =
-        authors.find(au => au.is_corresponding) || authors[0];
+        authors.find((au) => au.is_corresponding) || authors[0];
 
       return {
         ...a,
@@ -283,8 +306,11 @@ export const getReviewerAssignments = async (email) => {
               keywords: Array.isArray(p.keywords)
                 ? p.keywords
                 : p.keywords
-                ? p.keywords.split(",").map(k => k.trim()).filter(Boolean)
-                : [],
+                  ? p.keywords
+                      .split(",")
+                      .map((k) => k.trim())
+                      .filter(Boolean)
+                  : [],
               fileUrl: p.file_url || null,
               authorName: correspondingAuthor?.full_name || "",
               authorEmail: correspondingAuthor?.email || "",
@@ -323,7 +349,7 @@ export const submitReview = async (assignmentId, reviewData) => {
         weaknesses: reviewData.weaknesses,
         detailed_comments: reviewData.detailedComments,
         confidential_comments: reviewData.confidentialComments || "",
-        submitted_at: new Date().toISOString()
+        submitted_at: new Date().toISOString(),
       })
       .select()
       .single();
@@ -380,17 +406,19 @@ export const getPapersWithReviews = async () => {
 
     // Filter papers that have reviews
     const reviewsMap = {};
-    (reviews || []).forEach(r => {
+    (reviews || []).forEach((r) => {
       if (!reviewsMap[r.paper_id]) reviewsMap[r.paper_id] = [];
       reviewsMap[r.paper_id].push(r);
     });
 
-    const papersWithReviews = papers.filter(p => reviewsMap[p.id] && reviewsMap[p.id].length > 0);
+    const papersWithReviews = papers.filter(
+      (p) => reviewsMap[p.id] && reviewsMap[p.id].length > 0,
+    );
 
     if (papersWithReviews.length === 0) return [];
 
     // Step 3: Get paper IDs for next queries
-    const paperIds = papersWithReviews.map(p => p.id);
+    const paperIds = papersWithReviews.map((p) => p.id);
 
     // Step 4: Fetch editorial decisions
     const { data: decisionsData, error: decisionsError } = await supabase
@@ -403,7 +431,7 @@ export const getPapersWithReviews = async () => {
     }
 
     const decisionsMap = {};
-    (decisionsData || []).forEach(d => {
+    (decisionsData || []).forEach((d) => {
       decisionsMap[d.paper_id] = d;
     });
 
@@ -418,14 +446,14 @@ export const getPapersWithReviews = async () => {
     }
 
     const authorsMap = {};
-    (authorsData || []).forEach(a => {
+    (authorsData || []).forEach((a) => {
       if (!authorsMap[a.paper_id]) authorsMap[a.paper_id] = [];
       authorsMap[a.paper_id].push(a);
     });
 
     // Step 6: Fetch reviewers for reviews
     const reviewIds = [];
-    (reviews || []).forEach(r => {
+    (reviews || []).forEach((r) => {
       if (paperIds.includes(r.paper_id)) {
         reviewIds.push(r.reviewer_id);
       }
@@ -433,7 +461,7 @@ export const getPapersWithReviews = async () => {
 
     let reviewersData = [];
     const uniqueReviewerIds = [...new Set(reviewIds.filter(Boolean))];
-    
+
     if (uniqueReviewerIds.length > 0) {
       const { data: users, error: usersError } = await supabase
         .from("users")
@@ -448,36 +476,42 @@ export const getPapersWithReviews = async () => {
     }
 
     const reviewersMap = {};
-    reviewersData.forEach(u => { reviewersMap[u.id] = u; });
+    reviewersData.forEach((u) => {
+      reviewersMap[u.id] = u;
+    });
 
     // Step 7: Fetch paper authors user data for authorName
     const { data: paperAuthorsData, error: paperAuthorsError } = await supabase
       .from("users")
       .select("id, email, given_name, family_name")
-      .in("id", papersWithReviews.map(p => p.author_id).filter(Boolean));
+      .in("id", papersWithReviews.map((p) => p.author_id).filter(Boolean));
 
     if (paperAuthorsError) {
       console.error("Error fetching paper authors:", paperAuthorsError);
     }
 
     const paperAuthorsMap = {};
-    (paperAuthorsData || []).forEach(u => { paperAuthorsMap[u.id] = u; });
+    (paperAuthorsData || []).forEach((u) => {
+      paperAuthorsMap[u.id] = u;
+    });
 
     // Step 8: Combine all data
-    return papersWithReviews.map(p => ({
+    return papersWithReviews.map((p) => ({
       ...p,
       paper_authors: authorsMap[p.id] || [],
       // Attach full author user object so admin pages
       // (e.g. editorial decisions & publish flow) can
       // access `paper.users.email`, `given_name`, etc.
       users: paperAuthorsMap[p.author_id] || null,
-      reviews: (reviewsMap[p.id] || []).map(r => ({
+      reviews: (reviewsMap[p.id] || []).map((r) => ({
         ...r,
-        users: reviewersMap[r.reviewer_id] || null
+        users: reviewersMap[r.reviewer_id] || null,
       })),
       editorialDecision: decisionsMap[p.id]?.decision || null,
       editorialComments: decisionsMap[p.id]?.comments || null,
-      authorName: `${paperAuthorsMap[p.author_id]?.given_name || ""} ${paperAuthorsMap[p.author_id]?.family_name || ""}`.trim() || "N/A"
+      authorName:
+        `${paperAuthorsMap[p.author_id]?.given_name || ""} ${paperAuthorsMap[p.author_id]?.family_name || ""}`.trim() ||
+        "N/A",
     }));
   } catch (error) {
     console.error("Error getting papers with reviews:", error);
@@ -486,11 +520,19 @@ export const getPapersWithReviews = async () => {
 };
 
 /* ================= ADMIN FINAL DECISION ================= */
-export const makeEditorialDecision = async (paperId, editorId, decision, comments = "") => {
+export const makeEditorialDecision = async (
+  paperId,
+  editorId,
+  decision,
+  comments = "",
+) => {
   try {
     const newStatus =
-      decision === "accept" ? "accepted" :
-      decision === "reject" ? "rejected" : "revision_requested";
+      decision === "accept"
+        ? "accepted"
+        : decision === "reject"
+          ? "rejected"
+          : "revision_requested";
 
     // Step 1: Update paper status
     const { error: paperError } = await supabase
@@ -507,7 +549,7 @@ export const makeEditorialDecision = async (paperId, editorId, decision, comment
         editor_id: editorId,
         decision,
         comments,
-        decided_at: new Date().toISOString()
+        decided_at: new Date().toISOString(),
       });
     if (decisionError) throw decisionError;
 
@@ -530,13 +572,17 @@ export const makeEditorialDecision = async (paperId, editorId, decision, comment
         try {
           await sendEditorialDecisionEmail({
             authorEmail: userData.email,
-            authorName: `${userData.given_name || ""} ${userData.family_name || ""}`.trim(),
+            authorName:
+              `${userData.given_name || ""} ${userData.family_name || ""}`.trim(),
             paperTitle: paper.title,
             decision,
-            comments
+            comments,
           });
         } catch (emailError) {
-          console.warn("⚠️ Email notification failed, but decision was recorded:", emailError.message);
+          console.warn(
+            "⚠️ Email notification failed, but decision was recorded:",
+            emailError.message,
+          );
         }
       }
     }
