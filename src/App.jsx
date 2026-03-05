@@ -26,7 +26,7 @@ import Indexing from "./pages/Indexing";
 
 /* ================= POLICY & LEGAL PAGES ================= */
 import PublicationPolicy from "./pages/PublicationPolicy";
-import CopyrightPolicy from "./pages/CopyRightPolicy";
+import CopyRightPolicy from "./pages/CopyRightPolicy";
 import FAQs from "./pages/FAQs";
 import Disclaimer from "./pages/Disclaimer";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -157,7 +157,7 @@ export default function App() {
 
           {/* ================= POLICY & LEGAL ================= */}
           <Route path="/publication-policy" element={<MainLayout><PublicationPolicy /></MainLayout>} />
-          <Route path="/copyright-policy" element={<MainLayout><CopyrightPolicy /></MainLayout>} />
+          <Route path="/copyright-policy" element={<MainLayout><CopyRightPolicy /></MainLayout>} />
           <Route path="/faqs" element={<MainLayout><FAQs /></MainLayout>} />
           <Route path="/disclaimer" element={<MainLayout><Disclaimer /></MainLayout>} />
           <Route path="/privacy-policy" element={<MainLayout><PrivacyPolicy /></MainLayout>} />
